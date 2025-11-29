@@ -1,0 +1,84 @@
+Goal:
+Increase long-tail keyword reach and search performance by proposing THREE distinct, single-variable experiments for the listing below. Prioritize concrete, highly specific phrases and ensure diversity across experiments. These changes will be tested for a month or two, then reverted so please be creative and think outside the box! We can always revert.
+
+Listing Data:
+Title: {title}
+Description:
+{description}
+Tags: {tags}
+Listing Image IDs (first three, current order): {listing_image_ids}
+
+These image ids correspond to the order of the images below. The first image has the first tag, etc
+
+(Optional) Prior Experiments on this Listing:
+{prior_experiments_json}  // may be an empty list; if present, do not repeat prior change payloads
+
+Instructions:
+1. Brainstorm hypotheses that could raise search relevance or performance for real customer queries, especially long-tail, intent-rich searches (e.g. occasion, recipient, style, format).
+2. Propose THREE experiments:
+   - Each experiment MUST use exactly ONE change type: `"tags"`, `"title"`, `"description"`, or `"thumbnail"`.
+   - Across the three experiments, vary the change types when possible (e.g., do not propose three tag experiments unless clearly justified by the input).
+   - Each experiment must be independent and realistically testable on its own.
+3. When editing TAGS (`change_type == "tags"`):
+   - Propose at most FOUR tag swaps in total per experiment.
+   - Use Etsy-style tags: no commas inside a tag, no emojis, avoid duplicates, keep tags realistic for stationery.
+   - Emphasize long-tail phrases and buyer intent (recipient, occasion, style, format, quantity).
+   - Do NOT remove obviously critical core tags (e.g. “personalized stationery”, “stationery set”) unless they are clearly redundant or low quality.
+   - Hard Rules:
+      - Tags MUST be 20 characters or less
+4. When editing TITLE (`change_type == "title"`):
+   - Keep the product type, personalization status, and core identity intact.
+   - Make targeted edits that add specificity (occasion, audience, style, size, format) or improve keyword ordering for SEO.
+   - Hard Rules: 
+      - ALWAYS seperate clauses with commas
+      - The title MUST be less than 140 characters
+5. When editing DESCRIPTION (`change_type == "description"`):
+   - Add or refine phrases that better match likely search queries (e.g. “thank you cards for bridal shower,” “monogrammed stationery for kids”).
+   - Do NOT fabricate features (sizes, materials, quantities, production methods) that are not clearly implied by the existing listing.
+   - Keep the links and core information a buyer would need
+6. When editing THUMBNAIL (`change_type == "thumbnail"`):
+   - You may ONLY reorder existing images using the provided `listing_image_ids`.
+   - Suggest a `new_ordering` array of up to THREE IDs in the exact order they should appear, with the first ID being the new primary thumbnail.
+   - Choose an order that prioritizes a most effective thumbnail that shows up in search, etc. This is key to drawing customers in. It should be interesting, representative, and eye catching. If you don't think the current first image is this way, reorder.
+7. Prior experiment protection:
+   - If `{prior_experiments_json}` is provided, do NOT repeat an experiment whose `change_type` and `payload` match or are essentially equivalent to a past test for this listing.
+8. General quality rules:
+   - Focus on incremental, reversible changes that isolate one variable at a time.
+   - Do NOT propose more than one change type in a single experiment.
+   - Prefer edits that are likely to be measurable within a 1–2 month experiment window.
+   - Think outside the box!
+
+Output format:
+Return ONLY valid JSON, with no comments, no trailing commas, and no extra text. Use double quotes for all keys and string values.
+
+JSON schema:
+{{
+  "experiments": [
+    {{
+      "change_type": "tags" | "title" | "description" | "thumbnail",
+      "hypothesis": "A clear, testable statement of why this change should improve search performance.",
+      "implementation": "A concise description of how the change should be applied.",
+      "payload": {{
+        // For change_type == "tags":
+        //   "tags_to_add": ["..."],
+        //   "tags_to_remove": ["..."]
+        // For change_type == "title":
+        //   "new_title": "..."
+        // For change_type == "description":
+        //   "new_description": "..."
+        // For change_type == "thumbnail":
+        //   "new_ordering": ["listing_image_id_1", "listing_image_id_2", "listing_image_id_3"]
+      }}
+    }},
+    {{
+      ...
+    }},
+    {{
+      ...
+    }}
+  ]
+}}
+
+Remember:
+- Output MUST be strictly valid JSON.
+- Do not include `//` comments or any text outside the JSON in your actual response.
