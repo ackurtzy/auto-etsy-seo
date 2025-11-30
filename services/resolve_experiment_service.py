@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from datetime import date
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -31,9 +32,19 @@ class ResolveExperimentService:
         self.client = etsy_client
         self.sync_service = sync_service
 
-    def accept_experiment(self, listing_id: int, experiment_index: int) -> Dict[str, Any]:
-        experiments = self.repository.load_experiments(self.shop_id)
-        record = self._get_experiment(experiments, listing_id, experiment_index)
+    def accept_experiment(self, listing_id: int, experiment_id: str) -> Dict[str, Any]:
+        existing_testing = self.repository.get_testing_experiment(self.shop_id, listing_id)
+        if existing_testing:
+            raise ValueError(
+                f"Listing {listing_id} already has an experiment in testing. Finish it before accepting another."
+            )
+        record = self.repository.get_untested_experiment(
+            self.shop_id, listing_id, experiment_id
+        )
+        if not record:
+            raise ValueError(
+                f"Experiment {experiment_id} is not queued for listing {listing_id}."
+            )
         change = self._extract_change(record)
         listing_snapshot = self.repository.get_listing_snapshot(self.shop_id, listing_id)
         if not listing_snapshot:
@@ -48,23 +59,39 @@ class ResolveExperimentService:
         payload = self._build_change_payload(change, listing_snapshot, images_snapshot)
         if not payload:
             raise ValueError("Experiment payload is empty.")
+        baseline_snapshot = self._capture_baseline_performance(listing_id)
         self.client.update_listing(listing_id, payload)
         self.sync_service.sync_listing_images([listing_id])
 
-        record["state"] = ExperimentState.ACCEPTED.value
-        self.repository.save_all_experiments(self.shop_id, experiments)
+        if baseline_snapshot:
+            performance_meta = record.setdefault("performance", {})
+            performance_meta["baseline"] = baseline_snapshot
+
+        if not record.get("start_date"):
+            record["start_date"] = date.today().isoformat()
+        record["state"] = ExperimentState.TESTING.value
+        self.repository.save_testing_experiment(self.shop_id, listing_id, record)
+        self.repository.remove_untested_experiment(self.shop_id, listing_id, experiment_id)
         return record
 
-    def decline_experiment(self, listing_id: int, experiment_index: int) -> Dict[str, Any]:
-        experiments = self.repository.load_experiments(self.shop_id)
-        record = self._get_experiment(experiments, listing_id, experiment_index)
-        record["state"] = ExperimentState.DECLINED.value
-        self.repository.save_all_experiments(self.shop_id, experiments)
+    def keep_experiment(self, listing_id: int, experiment_id: str) -> Dict[str, Any]:
+        record = self.repository.get_testing_experiment(self.shop_id, listing_id)
+        if not record or str(record.get("experiment_id")) != str(experiment_id):
+            raise ValueError(
+                f"Experiment {experiment_id} is not currently testing for listing {listing_id}."
+            )
+        record["state"] = ExperimentState.KEPT.value
+        record["end_date"] = date.today().isoformat()
+        self.repository.append_tested_experiment(self.shop_id, listing_id, record)
+        self.repository.clear_testing_experiment(self.shop_id, listing_id)
         return record
 
-    def revert_experiment(self, listing_id: int, experiment_index: int) -> Dict[str, Any]:
-        experiments = self.repository.load_experiments(self.shop_id)
-        record = self._get_experiment(experiments, listing_id, experiment_index)
+    def revert_experiment(self, listing_id: int, experiment_id: str) -> Dict[str, Any]:
+        record = self.repository.get_testing_experiment(self.shop_id, listing_id)
+        if not record or str(record.get("experiment_id")) != str(experiment_id):
+            raise ValueError(
+                f"Experiment {experiment_id} is not currently testing for listing {listing_id}."
+            )
         original_listing = record.get("original_listing")
         original_images = record.get("original_listing_images")
         if not original_listing or not original_images:
@@ -80,26 +107,14 @@ class ResolveExperimentService:
         self.sync_service.sync_listing_images([listing_id])
         self.repository.upsert_listing_snapshot(self.shop_id, original_listing)
 
-        record["state"] = ExperimentState.DECLINED.value
-        self.repository.save_all_experiments(self.shop_id, experiments)
+        record["state"] = ExperimentState.REVERTED.value
+        record["end_date"] = date.today().isoformat()
+        self.repository.append_tested_experiment(self.shop_id, listing_id, record)
+        self.repository.clear_testing_experiment(self.shop_id, listing_id)
         return record
 
     # ------------------------------------------------------------------ #
     # Experiment helpers
-
-    def _get_experiment(
-        self, experiments: Dict[str, Any], listing_id: int, experiment_index: int
-    ) -> Dict[str, Any]:
-        listing_key = str(listing_id)
-        listing_experiments = experiments.get(listing_key)
-        if not listing_experiments:
-            raise ValueError(f"No experiments found for listing {listing_id}.")
-        try:
-            return listing_experiments[experiment_index]
-        except IndexError as exc:
-            raise ValueError(
-                f"Experiment index {experiment_index} is out of range for listing {listing_id}."
-            ) from exc
 
     def _extract_change(self, record: Dict[str, Any]) -> Dict[str, Any]:
         changes = record.get("changes") or []
@@ -353,3 +368,18 @@ class ResolveExperimentService:
 
         remap(manifest.get("results"))
         remap(manifest.get("files"))
+
+    def _capture_baseline_performance(self, listing_id: int) -> Optional[Dict[str, Any]]:
+        """Fetches the latest recorded performance snapshot for a listing."""
+        history = self.repository.load_performance_history(self.shop_id)
+        if not history:
+            return None
+        latest_date = max(history.keys())
+        listing_views = history.get(latest_date, {}).get(str(listing_id))
+        if listing_views is None:
+            return None
+        try:
+            views = int(listing_views)
+        except (TypeError, ValueError):
+            views = 0
+        return {"date": latest_date, "views": views}

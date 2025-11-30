@@ -21,8 +21,9 @@ class ExperimentState(str, Enum):
     """Lifecycle state for a listing experiment."""
 
     PROPOSED = "proposed"
-    ACCEPTED = "accepted"
-    DECLINED = "declined"
+    TESTING = "testing"
+    REVERTED = "reverted"
+    KEPT = "kept"
 
 
 @dataclass

@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
-from datetime import date
-from typing import Any, Dict, List, Optional
+from datetime import date, datetime
+from typing import Any, Callable, Dict, List, Optional
+from uuid import uuid4
 
 from clients.openai_client import OpenAIClient
 from models.listing_change import (
@@ -47,71 +48,102 @@ class GenerateExperimentService:
         today: Optional[date] = None,
         include_prior_experiments: bool = True,
         max_prior_experiments: int = 5,
+        selection_strategy: Optional[Callable[[List[Dict[str, Any]]], int]] = None,
     ) -> Dict[str, Any]:
         """Generates and persists an experiment for the provided listing."""
-        listing_snapshot = self.repository.get_listing_snapshot(self.shop_id, listing_id)
-        if not listing_snapshot:
-            raise ValueError(f"Listing {listing_id} has not been synced yet.")
-
-        images_snapshot = self.repository.get_listing_images_snapshot(
-            self.shop_id, listing_id
+        payload = self._prepare_generation_payload(
+            listing_id,
+            include_prior_experiments=include_prior_experiments,
+            max_prior_experiments=max_prior_experiments,
         )
-        if not images_snapshot:
-            raise ValueError(
-                f"Listing {listing_id} is missing image metadata. Run the sync process first."
-            )
-
-        prior_experiments = []
-        if include_prior_experiments:
-            experiments = self.repository.load_experiments(self.shop_id)
-            prior_experiments = experiments.get(str(listing_id), [])[-max_prior_experiments:]
-        listing_image_ids = [
-            str(result.get("listing_image_id"))
-            for result in (images_snapshot.get("results") or [])[:3]
-            if result.get("listing_image_id") is not None
-        ]
-        if not listing_image_ids:
-            listing_image_ids = [
-                str(entry.get("listing_image_id"))
-                for entry in (images_snapshot.get("files") or [])[:3]
-                if entry.get("listing_image_id") is not None
-            ]
-        text_prompt = self.user_prompt_template.format(
-            title=listing_snapshot.get("title", ""),
-            description=listing_snapshot.get("description", ""),
-            tags=", ".join(listing_snapshot.get("tags", []) or []),
-            listing_image_ids=", ".join(listing_image_ids[:3]),
-            prior_experiments_json=json.dumps(prior_experiments, indent=2),
-        )
-        image_blocks = self._prepare_image_blocks(images_snapshot)
-
-        response = self.openai_client.generate_json_response(
-            system_prompt=self.system_prompt,
-            user_content=[
-                {"type": "input_text", "text": text_prompt},
-                *image_blocks,
-            ],
-        )
-        experiment_payloads = response.get("experiments") or []
-        if len(experiment_payloads) != 3:
-            raise ValueError("Model response must contain exactly 3 experiment options.")
-
-        experiment_index = self._prompt_user_for_experiment(experiment_payloads)
+        experiment_payloads = payload["options"]
+        if selection_strategy is not None:
+            experiment_index = selection_strategy(experiment_payloads)
+        else:
+            experiment_index = self._prompt_user_for_experiment(experiment_payloads)
         chosen_payload = experiment_payloads[experiment_index]
 
         experiment = self._build_experiment_from_response(
             listing_id,
-            listing_snapshot,
-            images_snapshot,
+            payload["listing_snapshot"],
+            payload["images_snapshot"],
             chosen_payload,
             today or date.today(),
         )
 
-        experiment_record = self._serialize_experiment(experiment, response)
-        self.repository.save_experiment(
-            self.shop_id, listing_id, experiment_record
+        experiment_record = self._serialize_experiment(experiment, payload["llm_response"])
+        if not experiment_record.get("experiment_id"):
+            experiment_record["experiment_id"] = uuid4().hex
+        self.repository.add_untested_experiments(
+            self.shop_id, listing_id, [experiment_record]
         )
         return experiment_record
+
+    def propose_experiments(
+        self,
+        listing_id: int,
+        include_prior_experiments: bool = True,
+        max_prior_experiments: int = 5,
+    ) -> Dict[str, Any]:
+        """Generates proposals and persists the latest bundle for the listing."""
+        if self.repository.get_testing_experiment(self.shop_id, listing_id):
+            raise ValueError(
+                f"Listing {listing_id} already has an experiment in testing. Finish it before creating new proposals."
+            )
+        untested = self.repository.load_untested_experiments(self.shop_id).get(
+            str(listing_id)
+        )
+        if untested:
+            raise ValueError(
+                f"Listing {listing_id} has untested experiments. Promote those before generating a new proposal bundle."
+            )
+        payload = self._prepare_generation_payload(
+            listing_id,
+            include_prior_experiments=include_prior_experiments,
+            max_prior_experiments=max_prior_experiments,
+        )
+        self._assign_option_ids(payload["options"])
+        payload["generated_at"] = datetime.utcnow().isoformat()
+        self.repository.save_proposal(self.shop_id, listing_id, payload)
+        return payload
+
+    def build_experiments_from_proposal(
+        self,
+        proposal: Dict[str, Any],
+        start_date: Optional[date] = None,
+    ) -> List[Dict[str, Any]]:
+        """Expands a stored proposal into serialized experiment records."""
+        options: List[Dict[str, Any]] = proposal.get("options") or []
+        if not options:
+            raise ValueError("Proposal missing experiment options.")
+
+        listing_id = proposal.get("listing_id")
+        if listing_id is None:
+            raise ValueError("Proposal missing listing_id.")
+
+        listing_snapshot = proposal.get("listing_snapshot")
+        images_snapshot = proposal.get("images_snapshot")
+        if not listing_snapshot or not images_snapshot:
+            raise ValueError("Proposal missing cached listing data.")
+
+        experiments: List[Dict[str, Any]] = []
+        for idx, option in enumerate(options):
+            experiment = self._build_experiment_from_response(
+                listing_id,
+                listing_snapshot,
+                images_snapshot,
+                option,
+                start_date or date.today(),
+            )
+            record = self._serialize_experiment(experiment, proposal.get("llm_response") or {})
+            record["option_index"] = idx
+            option_id = option.get("experiment_id")
+            if option_id:
+                record["experiment_id"] = str(option_id)
+            if not record.get("experiment_id"):
+                record["experiment_id"] = uuid4().hex
+            experiments.append(record)
+        return experiments
 
     def _prepare_image_blocks(self, images_snapshot: Dict[str, Any]) -> List[Dict[str, str]]:
         """Formats the first three images into OpenAI vision content blocks."""
@@ -196,6 +228,75 @@ class GenerateExperimentService:
         payload = asdict(change)
         payload["change_type"] = change.change_type.value
         return payload
+
+    def _assign_option_ids(self, options: List[Dict[str, Any]]) -> None:
+        for option in options:
+            if not option.get("experiment_id"):
+                option["experiment_id"] = uuid4().hex
+
+    def _prepare_generation_payload(
+        self,
+        listing_id: int,
+        include_prior_experiments: bool,
+        max_prior_experiments: int,
+    ) -> Dict[str, Any]:
+        listing_snapshot = self.repository.get_listing_snapshot(self.shop_id, listing_id)
+        if not listing_snapshot:
+            raise ValueError(f"Listing {listing_id} has not been synced yet.")
+
+        images_snapshot = self.repository.get_listing_images_snapshot(
+            self.shop_id, listing_id
+        )
+        if not images_snapshot:
+            raise ValueError(
+                f"Listing {listing_id} is missing image metadata. Run the sync process first."
+            )
+
+        prior_experiments = []
+        if include_prior_experiments:
+            experiments = self.repository.load_tested_experiments(self.shop_id)
+            prior_experiments = experiments.get(str(listing_id), [])[-max_prior_experiments:]
+
+        listing_image_ids = [
+            str(result.get("listing_image_id"))
+            for result in (images_snapshot.get("results") or [])[:3]
+            if result.get("listing_image_id") is not None
+        ]
+        if not listing_image_ids:
+            listing_image_ids = [
+                str(entry.get("listing_image_id"))
+                for entry in (images_snapshot.get("files") or [])[:3]
+                if entry.get("listing_image_id") is not None
+            ]
+        text_prompt = self.user_prompt_template.format(
+            title=listing_snapshot.get("title", ""),
+            description=listing_snapshot.get("description", ""),
+            tags=", ".join(listing_snapshot.get("tags", []) or []),
+            listing_image_ids=", ".join(listing_image_ids[:3]),
+            prior_experiments_json=json.dumps(prior_experiments, indent=2),
+        )
+        image_blocks = self._prepare_image_blocks(images_snapshot)
+
+        response = self.openai_client.generate_json_response(
+            system_prompt=self.system_prompt,
+            user_content=[
+                {"type": "input_text", "text": text_prompt},
+                *image_blocks,
+            ],
+        )
+        experiment_payloads = response.get("experiments") or []
+        if len(experiment_payloads) != 3:
+            raise ValueError("Model response must contain exactly 3 experiment options.")
+
+        return {
+            "listing_id": listing_id,
+            "options": experiment_payloads,
+            "llm_response": response,
+            "listing_snapshot": listing_snapshot,
+            "images_snapshot": images_snapshot,
+            "prior_experiments": prior_experiments,
+            "generated_at": datetime.utcnow().isoformat(),
+        }
 
     def _prompt_user_for_experiment(self, experiment_options: List[Dict[str, Any]]) -> int:
         """Prompts the user to choose one of the provided experiment options."""

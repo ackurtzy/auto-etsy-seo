@@ -57,16 +57,14 @@ def main() -> int:
             "Experiment generated: %s", json.dumps(record["changes"][0], indent=2)
         )
 
-        experiments = repository.load_experiments(SHOP_ID)
-        listing_records = experiments[str(listing_id)]
-        experiment_index = len(listing_records) - 1
+        experiment_id = record["experiment_id"]
 
         logging.info("Applying generated experiment...")
-        resolve_service.accept_experiment(listing_id, experiment_index)
+        resolve_service.accept_experiment(listing_id, experiment_id)
 
         input("Change applied. Check listing on Etsy, then press Enter to revert...")
         logging.info("Reverting generated experiment...")
-        resolve_service.revert_experiment(listing_id, experiment_index)
+        resolve_service.revert_experiment(listing_id, experiment_id)
 
     logging.info("Pipeline completed successfully.")
     return 0

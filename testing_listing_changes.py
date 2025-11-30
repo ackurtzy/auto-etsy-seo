@@ -8,6 +8,7 @@ from dataclasses import asdict
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any, Dict, List
+from uuid import uuid4
 
 from clients.etsy_client import EtsyClient
 from models.listing_change import (
@@ -124,17 +125,19 @@ def serialize_experiment(experiment: ListingExperiment) -> Dict[str, Any]:
 
 def run_experiments(
     resolve_service: ResolveExperimentService,
-    experiment_indices: List[int],
+    experiment_ids: List[str],
 ) -> None:
-    for index in experiment_indices:
-        logging.info("Applying experiment index %s for listing %s", index, LISTING_ID)
-        response = resolve_service.accept_experiment(LISTING_ID, index)
+    for experiment_id in experiment_ids:
+        logging.info(
+            "Applying experiment %s for listing %s", experiment_id, LISTING_ID
+        )
+        response = resolve_service.accept_experiment(LISTING_ID, experiment_id)
         logging.info("Experiment applied. State: %s", response["state"])
         logging.debug("Response snapshot:\n%s", json.dumps(response, indent=2))
 
         _await_user_confirmation()
-        logging.info("Reverting experiment index %s", index)
-        reverted = resolve_service.revert_experiment(LISTING_ID, index)
+        logging.info("Reverting experiment %s", experiment_id)
+        reverted = resolve_service.revert_experiment(LISTING_ID, experiment_id)
         logging.info("Experiment reverted. State: %s", reverted["state"])
 
 
@@ -177,14 +180,14 @@ def main() -> int:
 
     chosen_experiments = [experiments[index] for index in indices]
 
-    experiment_indices: List[int] = []
+    experiment_ids: List[str] = []
     for experiment in chosen_experiments:
         record = serialize_experiment(experiment)
-        experiments_data = repository.save_experiment(SHOP_ID, LISTING_ID, record)
-        listing_records = experiments_data[str(LISTING_ID)]
-        experiment_indices.append(len(listing_records) - 1)
+        record["experiment_id"] = uuid4().hex
+        repository.add_untested_experiments(SHOP_ID, LISTING_ID, [record])
+        experiment_ids.append(record["experiment_id"])
 
-    run_experiments(resolve_service, experiment_indices)
+    run_experiments(resolve_service, experiment_ids)
     return 0
 
 

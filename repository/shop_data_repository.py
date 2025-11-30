@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from utils import file_lib
 
@@ -21,6 +21,10 @@ class ShopDataRepository:
         self._session_cache: Dict[int, Dict[str, Any]] = {}
         self._images_manifest_cache: Dict[int, Dict[str, Any]] = {}
         self._performance_cache: Dict[int, Dict[str, Any]] = {}
+        self._proposals_cache: Dict[int, Dict[str, Any]] = {}
+        self._testing_cache: Dict[int, Dict[str, Any]] = {}
+        self._untested_cache: Dict[int, Dict[str, Any]] = {}
+        self._tested_cache: Dict[int, Dict[str, Any]] = {}
 
     def save_listings(self, shop_id: int, payload: Dict[str, Any]) -> str:
         """Persists listings payload and stores it in session cache.
@@ -344,38 +348,115 @@ class ShopDataRepository:
         self._performance_cache[shop_id] = manifest
         return manifest
 
+    def _proposals_path(self, shop_id: int) -> str:
+        folder_path = self._experiments_dir(shop_id)
+        return os.path.join(folder_path, "proposals.json")
+
+    def _load_proposals(self, shop_id: int) -> Dict[str, Any]:
+        if shop_id in self._proposals_cache:
+            return self._proposals_cache[shop_id]
+        path = self._proposals_path(shop_id)
+        if os.path.exists(path):
+            manifest = file_lib.read_json(path)
+        else:
+            manifest = {}
+        self._proposals_cache[shop_id] = manifest
+        return manifest
+
+    def _save_proposals(self, shop_id: int, manifest: Dict[str, Any]) -> Dict[str, Any]:
+        self._proposals_cache[shop_id] = manifest
+        path = self._proposals_path(shop_id)
+        file_lib.save_to_json(path, manifest)
+        return manifest
+
+    def _testing_experiments_path(self, shop_id: int) -> str:
+        folder_path = self._experiments_dir(shop_id)
+        return os.path.join(folder_path, "testing_experiments.json")
+
+    def _load_testing_manifest(self, shop_id: int) -> Dict[str, Any]:
+        if shop_id in self._testing_cache:
+            return self._testing_cache[shop_id]
+        path = self._testing_experiments_path(shop_id)
+        if os.path.exists(path):
+            manifest = file_lib.read_json(path)
+        else:
+            manifest = {}
+        self._testing_cache[shop_id] = manifest
+        return manifest
+
+    def _save_testing_manifest(self, shop_id: int, manifest: Dict[str, Any]) -> Dict[str, Any]:
+        self._testing_cache[shop_id] = manifest
+        path = self._testing_experiments_path(shop_id)
+        file_lib.save_to_json(path, manifest)
+        return manifest
+
+    def _untested_experiments_path(self, shop_id: int) -> str:
+        folder_path = self._experiments_dir(shop_id)
+        return os.path.join(folder_path, "untested_experiments.json")
+
+    def _load_untested_manifest(self, shop_id: int) -> Dict[str, Any]:
+        if shop_id in self._untested_cache:
+            return self._untested_cache[shop_id]
+        path = self._untested_experiments_path(shop_id)
+        if os.path.exists(path):
+            manifest = file_lib.read_json(path)
+        else:
+            manifest = {}
+        self._untested_cache[shop_id] = manifest
+        return manifest
+
+    def _save_untested_manifest(self, shop_id: int, manifest: Dict[str, Any]) -> Dict[str, Any]:
+        self._untested_cache[shop_id] = manifest
+        path = self._untested_experiments_path(shop_id)
+        file_lib.save_to_json(path, manifest)
+        return manifest
+
+    def _load_tested_manifest(self, shop_id: int) -> Dict[str, Any]:
+        if shop_id in self._tested_cache:
+            return self._tested_cache[shop_id]
+        path = self._tested_experiments_path(shop_id)
+        if os.path.exists(path):
+            manifest = file_lib.read_json(path)
+        else:
+            manifest = {}
+        self._tested_cache[shop_id] = manifest
+        if not os.path.exists(path):
+            file_lib.save_to_json(path, manifest)
+        return manifest
+
+    def _save_tested_manifest(self, shop_id: int, manifest: Dict[str, Any]) -> Dict[str, Any]:
+        self._tested_cache[shop_id] = manifest
+        path = self._tested_experiments_path(shop_id)
+        file_lib.save_to_json(path, manifest)
+        return manifest
+
     # Experiment persistence -------------------------------------------------
 
-    def _experiments_path(self, shop_id: int) -> str:
-        folder_path = self._ensure_shop_folder(shop_id)
-        return os.path.join(folder_path, "experiments.json")
+    def _experiments_dir(self, shop_id: int) -> str:
+        folder_path = os.path.join(self.base_data_path, str(shop_id), "experiments")
+        file_lib.make_folder(folder_path)
+        return folder_path
 
-    def load_experiments(self, shop_id: int) -> Dict[str, Any]:
-        path = self._experiments_path(shop_id)
-        if os.path.exists(path):
-            return file_lib.read_json(path)
-        return {}
+    def _tested_experiments_path(self, shop_id: int) -> str:
+        folder_path = self._experiments_dir(shop_id)
+        return os.path.join(folder_path, "tested_experiments.json")
 
-    def save_experiment(
-        self,
-        shop_id: int,
-        listing_id: int,
-        experiment_record: Dict[str, Any],
+    def load_tested_experiments(self, shop_id: int) -> Dict[str, Any]:
+        return self._load_tested_manifest(shop_id)
+
+    def append_tested_experiment(
+        self, shop_id: int, listing_id: int, record: Dict[str, Any]
     ) -> Dict[str, Any]:
-        experiments = self.load_experiments(shop_id)
-        listing_key = str(listing_id)
-        experiments.setdefault(listing_key, [])
-        experiments[listing_key].append(experiment_record)
-        path = self._experiments_path(shop_id)
-        file_lib.save_to_json(path, experiments)
-        return experiments
+        manifest = self._load_tested_manifest(shop_id)
+        manifest.setdefault(str(listing_id), [])
+        manifest[str(listing_id)].append(record)
+        self._save_tested_manifest(shop_id, manifest)
+        return manifest[str(listing_id)]
 
-    def save_all_experiments(
-        self, shop_id: int, experiments: Dict[str, Any]
+    def save_tested_experiments(
+        self, shop_id: int, manifest: Dict[str, Any]
     ) -> Dict[str, Any]:
-        path = self._experiments_path(shop_id)
-        file_lib.save_to_json(path, experiments)
-        return experiments
+        return self._save_tested_manifest(shop_id, manifest)
 
     def upsert_listing_snapshot(
         self, shop_id: int, listing_record: Dict[str, Any]
@@ -403,3 +484,88 @@ class ShopDataRepository:
         file_lib.save_to_json(listings_path, payload)
         self._session_cache[shop_id] = payload
         return payload
+
+    # Proposal persistence --------------------------------------------------
+
+    def load_proposals(self, shop_id: int) -> Dict[str, Any]:
+        return self._load_proposals(shop_id)
+
+    def save_proposal(
+        self, shop_id: int, listing_id: int, proposal_record: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        manifest = self._load_proposals(shop_id)
+        manifest[str(listing_id)] = proposal_record
+        return self._save_proposals(shop_id, manifest)
+
+    def get_proposal(self, shop_id: int, listing_id: int) -> Optional[Dict[str, Any]]:
+        proposals = self._load_proposals(shop_id)
+        return proposals.get(str(listing_id))
+
+    def delete_proposal(self, shop_id: int, listing_id: int) -> None:
+        manifest = self._load_proposals(shop_id)
+        if str(listing_id) in manifest:
+            del manifest[str(listing_id)]
+            self._save_proposals(shop_id, manifest)
+
+    # Testing experiments ---------------------------------------------------
+
+    def load_testing_experiments(self, shop_id: int) -> Dict[str, Any]:
+        return self._load_testing_manifest(shop_id)
+
+    def get_testing_experiment(
+        self, shop_id: int, listing_id: int
+    ) -> Optional[Dict[str, Any]]:
+        manifest = self._load_testing_manifest(shop_id)
+        return manifest.get(str(listing_id))
+
+    def save_testing_experiment(
+        self, shop_id: int, listing_id: int, record: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        manifest = self._load_testing_manifest(shop_id)
+        manifest[str(listing_id)] = record
+        return self._save_testing_manifest(shop_id, manifest)
+
+    def clear_testing_experiment(self, shop_id: int, listing_id: int) -> None:
+        manifest = self._load_testing_manifest(shop_id)
+        if str(listing_id) in manifest:
+            del manifest[str(listing_id)]
+            self._save_testing_manifest(shop_id, manifest)
+
+    # Untested experiments --------------------------------------------------
+
+    def load_untested_experiments(self, shop_id: int) -> Dict[str, Any]:
+        return self._load_untested_manifest(shop_id)
+
+    def add_untested_experiments(
+        self, shop_id: int, listing_id: int, experiment_records: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        manifest = self._load_untested_manifest(shop_id)
+        listing_dict = manifest.setdefault(str(listing_id), {})
+        for record in experiment_records:
+            experiment_id = record.get("experiment_id")
+            if experiment_id is None:
+                raise ValueError("experiment_record missing experiment_id.")
+            listing_dict[str(experiment_id)] = record
+        return self._save_untested_manifest(shop_id, manifest)
+
+    def remove_untested_experiment(
+        self, shop_id: int, listing_id: int, experiment_id: str
+    ) -> Optional[Dict[str, Any]]:
+        manifest = self._load_untested_manifest(shop_id)
+        listing_dict = manifest.get(str(listing_id))
+        if not listing_dict:
+            return None
+        record = listing_dict.pop(str(experiment_id), None)
+        if not listing_dict:
+            manifest.pop(str(listing_id), None)
+        self._save_untested_manifest(shop_id, manifest)
+        return record
+
+    def get_untested_experiment(
+        self, shop_id: int, listing_id: int, experiment_id: str
+    ) -> Optional[Dict[str, Any]]:
+        manifest = self._load_untested_manifest(shop_id)
+        listing_dict = manifest.get(str(listing_id))
+        if not listing_dict:
+            return None
+        return listing_dict.get(str(experiment_id))
