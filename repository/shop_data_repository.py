@@ -25,6 +25,8 @@ class ShopDataRepository:
         self._testing_cache: Dict[int, Dict[str, Any]] = {}
         self._untested_cache: Dict[int, Dict[str, Any]] = {}
         self._tested_cache: Dict[int, Dict[str, Any]] = {}
+        self._reports_cache: Dict[int, List[Dict[str, Any]]] = {}
+        self._active_insights_cache: Dict[int, List[Dict[str, Any]]] = {}
 
     def save_listings(self, shop_id: int, payload: Dict[str, Any]) -> str:
         """Persists listings payload and stores it in session cache.
@@ -430,6 +432,14 @@ class ShopDataRepository:
         file_lib.save_to_json(path, manifest)
         return manifest
 
+    def _reports_path(self, shop_id: int) -> str:
+        folder_path = self._ensure_shop_folder(shop_id)
+        return os.path.join(folder_path, "reports.json")
+
+    def _active_insights_path(self, shop_id: int) -> str:
+        folder_path = self._ensure_shop_folder(shop_id)
+        return os.path.join(folder_path, "active_insights.json")
+
     # Experiment persistence -------------------------------------------------
 
     def _experiments_dir(self, shop_id: int) -> str:
@@ -457,6 +467,76 @@ class ShopDataRepository:
         self, shop_id: int, manifest: Dict[str, Any]
     ) -> Dict[str, Any]:
         return self._save_tested_manifest(shop_id, manifest)
+
+    # Reports and insights ---------------------------------------------------
+
+    def load_reports(self, shop_id: int) -> List[Dict[str, Any]]:
+        if shop_id in self._reports_cache:
+            return self._reports_cache[shop_id]
+        path = self._reports_path(shop_id)
+        if os.path.exists(path):
+            reports = file_lib.read_json(path)
+        else:
+            reports = []
+        self._reports_cache[shop_id] = reports
+        return reports
+
+    def append_report(self, shop_id: int, report_record: Dict[str, Any]) -> List[Dict[str, Any]]:
+        reports = self.load_reports(shop_id)
+        reports.append(report_record)
+        return self.save_reports(shop_id, reports)
+
+    def save_reports(self, shop_id: int, reports: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        path = self._reports_path(shop_id)
+        file_lib.save_to_json(path, reports)
+        self._reports_cache[shop_id] = reports
+        return reports
+
+    def get_report(self, shop_id: int, report_id: str) -> Optional[Dict[str, Any]]:
+        reports = self.load_reports(shop_id)
+        for report in reports:
+            if report.get("report_id") == report_id:
+                return report
+        return None
+
+    def load_active_insights(self, shop_id: int) -> List[Dict[str, Any]]:
+        if shop_id in self._active_insights_cache:
+            return self._active_insights_cache[shop_id]
+        path = self._active_insights_path(shop_id)
+        if os.path.exists(path):
+            insights = file_lib.read_json(path)
+        else:
+            insights = []
+        self._active_insights_cache[shop_id] = insights
+        return insights
+
+    def add_active_insights(
+        self, shop_id: int, insights: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        manifest = self.load_active_insights(shop_id)
+        manifest.extend(insights)
+        return self.save_active_insights(shop_id, manifest)
+
+    def remove_active_insights(
+        self, shop_id: int, insight_ids: List[str]
+    ) -> List[Dict[str, Any]]:
+        manifest = self.load_active_insights(shop_id)
+        ids = {str(insight_id) for insight_id in insight_ids if insight_id}
+        if not ids:
+            return manifest
+        manifest = [ins for ins in manifest if str(ins.get("insight_id")) not in ids]
+        return self.save_active_insights(shop_id, manifest)
+
+    def remove_active_insight(self, shop_id: int, insight_id: str) -> List[Dict[str, Any]]:
+        return self.remove_active_insights(shop_id, [insight_id])
+
+    def save_active_insights(
+        self, shop_id: int, manifest: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        path = self._active_insights_path(shop_id)
+        file_lib.save_to_json(path, manifest)
+        self._active_insights_cache[shop_id] = manifest
+        return manifest
 
     def upsert_listing_snapshot(
         self, shop_id: int, listing_record: Dict[str, Any]

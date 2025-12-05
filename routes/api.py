@@ -23,6 +23,7 @@ from repository.shop_data_repository import ShopDataRepository
 from services.generate_experiment_service import GenerateExperimentService
 from services.resolve_experiment_service import ResolveExperimentService
 from services.evaluate_experiment_service import EvaluateExperimentService
+from services.report_service import ReportService
 from services.sync_service import SyncService
 
 LOGGER = logging.getLogger(__name__)
@@ -61,6 +62,11 @@ def _get_components() -> Dict[str, Any]:
             shop_id=settings.shop_id,
             repository=repository,
         )
+        report_service = ReportService(
+            shop_id=settings.shop_id,
+            repository=repository,
+            evaluate_service=evaluate_service,
+        )
         _COMPONENTS = {
             "repository": repository,
             "etsy_client": etsy_client,
@@ -68,6 +74,7 @@ def _get_components() -> Dict[str, Any]:
             "generate_service": generate_service,
             "resolve_service": resolve_service,
             "evaluate_service": evaluate_service,
+            "report_service": report_service,
         }
     return _COMPONENTS
 
@@ -433,16 +440,6 @@ def select_proposal_option(listing_id: int):
         # Selected experiment remains in untested backlog for manual retry.
         return jsonify({"error": str(exc)}), 400
 
-    return jsonify(
-        {
-            "listing_id": listing_id,
-            "experiment_id": accepted_record["experiment_id"],
-            "state": accepted_record.get("state"),
-            "untested_experiments": [
-                record["experiment_id"] for record in untested_records
-            ],
-        }
-    )
 
 
 @app.route("/experiments/testing", methods=["GET"])
@@ -554,55 +551,104 @@ def evaluate_experiment(listing_id: int, experiment_id: str):
         return jsonify({"error": str(exc)}), 500
 
 
-@app.route("/reports/experiments", methods=["POST"])
+@app.route("/reports", methods=["GET"])
+def list_reports():
+    repository = _get_components()["repository"]
+    reports = repository.load_reports(settings.shop_id)
+    return jsonify({"results": reports, "count": len(reports)})
+
+
+@app.route("/reports/<report_id>", methods=["GET"])
+def get_report(report_id: str):
+    repository = _get_components()["repository"]
+    report = repository.get_report(settings.shop_id, report_id)
+    if not report:
+        return jsonify({"error": "Report not found."}), 404
+    return jsonify(report)
+
+
+@app.route("/reports", methods=["POST"])
 def generate_experiment_report():
     components = _get_components()
-    repository: ShopDataRepository = components["repository"]
-    generate_service: GenerateExperimentService = components["generate_service"]
+    report_service: ReportService = components["report_service"]
     payload = request.get_json(silent=True) or {}
-    listing_filter = _parse_listing_ids(payload.get("listing_ids"))
-    use_llm = payload.get("use_llm", True)
-
-    experiments = repository.load_tested_experiments(settings.shop_id)
-    report_rows: List[Dict[str, Any]] = []
-    for listing_id, records in experiments.items():
-        numeric_listing_id = int(listing_id)
-        if listing_filter and numeric_listing_id not in listing_filter:
-            continue
-        for record in records:
-            entry = {
-                "listing_id": numeric_listing_id,
-                "experiment_id": record.get("experiment_id"),
-                "state": record.get("state"),
-                "change_types": [change.get("change_type") for change in record.get("changes", [])],
-                "baseline": (record.get("performance") or {}).get("baseline"),
-                "latest": (record.get("performance") or {}).get("latest"),
-                "notes": record.get("notes"),
-            }
-            report_rows.append(entry)
-
-    if not use_llm:
-        return jsonify({"experiments": report_rows})
-
-    if not report_rows:
-        return jsonify({"error": "No experiments found to summarize."}), 400
-
-    system_prompt = (
-        "You are an analytics assistant that summarizes Etsy SEO experiments. "
-        "Given JSON data describing experiments, highlight wins, losses, and recommend next actions. "
-        "Respond with JSON containing keys 'report' (markdown string) and 'actions' (list)."
-    )
-    user_payload = json.dumps({"experiments": report_rows}, indent=2)
+    days_back = int(payload.get("days_back") or 30)
     try:
-        response = generate_service.openai_client.generate_json_response(
-            system_prompt=system_prompt,
-            user_content=[{"type": "input_text", "text": user_payload}],
-        )
-        return jsonify({"experiments": report_rows, "llm_report": response})
+        report = report_service.generate_report(days_back=days_back)
+        return jsonify(report)
     except Exception as exc:
-        LOGGER.exception("Failed to generate LLM report, returning fallback text.")
-        fallback = _build_fallback_report(report_rows)
-        return jsonify({"experiments": report_rows, "llm_report": fallback, "error": str(exc)}), 207
+        LOGGER.exception("Failed to generate experiment report.")
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/reports/<report_id>/activate_insights", methods=["POST"])
+def activate_insights(report_id: str):
+    components = _get_components()
+    report_service: ReportService = components["report_service"]
+    payload = request.get_json(silent=True) or {}
+    insight_ids = payload.get("insight_ids") or []
+    if not insight_ids:
+        return jsonify({"error": "insight_ids is required."}), 400
+    try:
+        updated = report_service.activate_insights(report_id, insight_ids)
+        return jsonify({"active_insights": updated})
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/insights/active", methods=["GET"])
+def list_active_insights():
+    repository = _get_components()["repository"]
+    insights = repository.load_active_insights(settings.shop_id)
+    return jsonify({"results": insights, "count": len(insights)})
+
+
+@app.route("/insights/active/<insight_id>", methods=["DELETE"])
+def delete_active_insight(insight_id: str):
+    repository = _get_components()["repository"]
+    insights = repository.load_active_insights(settings.shop_id)
+    if not any(ins.get("insight_id") == insight_id for ins in insights):
+        return jsonify({"error": "Insight not found."}), 404
+    updated = repository.remove_active_insight(settings.shop_id, insight_id)
+    return jsonify({"deleted": True, "remaining": updated})
+
+
+@app.route("/insights/active/deactivate", methods=["POST"])
+def deactivate_active_insights():
+    repository = _get_components()["repository"]
+    payload = request.get_json(silent=True) or {}
+    insight_ids = payload.get("insight_ids")
+    if isinstance(insight_ids, str):
+        insight_ids = [insight_ids]
+    if not insight_ids or not isinstance(insight_ids, list):
+        return jsonify({"error": "insight_ids array is required."}), 400
+    normalized_ids: List[str] = []
+    for raw_id in insight_ids:
+        if raw_id is None:
+            continue
+        text_id = str(raw_id).strip()
+        if text_id:
+            normalized_ids.append(text_id)
+    if not normalized_ids:
+        return jsonify({"error": "insight_ids array is required."}), 400
+    insights = repository.load_active_insights(settings.shop_id)
+    existing_ids = {
+        str(insight.get("insight_id"))
+        for insight in insights
+        if insight.get("insight_id")
+    }
+    found_ids = [ins_id for ins_id in normalized_ids if ins_id in existing_ids]
+    missing_ids = [ins_id for ins_id in normalized_ids if ins_id not in existing_ids]
+    if not found_ids:
+        return jsonify({"error": "No matching insights found."}), 404
+    updated = repository.remove_active_insights(settings.shop_id, found_ids)
+    return jsonify(
+        {
+            "removed": found_ids,
+            "missing": missing_ids,
+            "remaining": updated,
+        }
+    )
 
 
 def _build_fallback_report(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
