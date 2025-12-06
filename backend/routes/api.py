@@ -235,7 +235,8 @@ def sync_data():
     sync_service: SyncService = components["sync_service"]
     repository: ShopDataRepository = components["repository"]
     payload = request.get_json(silent=True) or {}
-    limit = int(payload.get("limit") or 100)
+    limit_value = int(payload.get("limit") or 100)
+    limit = min(max(limit_value, 1), 100)
     sort_on = payload.get("sort_on", "created")
     sort_order = payload.get("sort_order", "desc")
     keywords = payload.get("keywords")

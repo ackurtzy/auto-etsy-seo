@@ -1,0 +1,12 @@
+export const panelClass = 'rounded-[22px] border border-white/60 bg-white/95 p-6 shadow-card backdrop-blur'
+export const subtleTextClass = 'text-sm text-brand-muted'
+export const labelClass = 'text-[11px] font-semibold uppercase tracking-[0.14em] text-brand-muted'
+export const eyebrowClass = 'text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-muted'
+export const pageTitleClass = 'font-serif text-[2.75rem] leading-tight text-brand-text tracking-[-0.04em]'
+export const sectionTitleClass = 'font-serif text-2xl font-semibold text-brand-text'
+export const inputClass = 'w-full rounded-xl border border-border/50 bg-white px-3 py-2.5 text-sm text-brand-text placeholder:text-brand-muted focus:border-primary focus:ring-2 focus:ring-primary/30 focus:outline-none'
+const buttonBase = 'inline-flex items-center justify-center rounded-xl text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary disabled:cursor-not-allowed disabled:opacity-60 shadow-sm'
+export const primaryButtonClass = `${buttonBase} bg-primary text-white hover:-translate-y-0.5 hover:bg-primary-hover disabled:bg-primary-disabled`
+export const secondaryButtonClass = `${buttonBase} border border-border/60 bg-white text-brand-text hover:-translate-y-0.5 hover:text-primary hover:border-primary`
+export const chipClass = 'inline-flex items-center gap-2 rounded-full border border-border/50 bg-surface px-3 py-1 text-xs font-semibold text-brand-text'
+export const mutedPillClass = 'inline-flex items-center gap-2 rounded-full bg-surface-muted px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-muted'
