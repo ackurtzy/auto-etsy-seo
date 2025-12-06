@@ -22,6 +22,7 @@ from repository.shop_data_repository import ShopDataRepository
 from utils import file_lib
 from utils.image_utils import build_image_data_blocks
 
+DEFAULT_RUN_DURATION_DAYS = 14
 
 class GenerateExperimentService:
     """Coordinates fetching listing data, calling OpenAI, and saving experiments."""
@@ -84,6 +85,8 @@ class GenerateExperimentService:
         listing_id: int,
         include_prior_experiments: bool = True,
         max_prior_experiments: int = 5,
+        run_duration_days: Optional[int] = None,
+        model_used: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generates proposals and persists the latest bundle for the listing."""
         if self.repository.get_testing_experiment(self.shop_id, listing_id):
@@ -102,6 +105,11 @@ class GenerateExperimentService:
             include_prior_experiments=include_prior_experiments,
             max_prior_experiments=max_prior_experiments,
         )
+        if run_duration_days is None:
+            run_duration_days = DEFAULT_RUN_DURATION_DAYS
+        payload["run_duration_days"] = run_duration_days
+        if model_used:
+            payload["model_used"] = model_used
         self._assign_option_ids(payload["options"])
         payload["generated_at"] = datetime.utcnow().isoformat()
         self.repository.save_proposal(self.shop_id, listing_id, payload)
@@ -125,6 +133,8 @@ class GenerateExperimentService:
         images_snapshot = proposal.get("images_snapshot")
         if not listing_snapshot or not images_snapshot:
             raise ValueError("Proposal missing cached listing data.")
+        run_duration_days = proposal.get("run_duration_days") or DEFAULT_RUN_DURATION_DAYS
+        model_used = proposal.get("model_used")
 
         experiments: List[Dict[str, Any]] = []
         for idx, option in enumerate(options):
@@ -142,6 +152,9 @@ class GenerateExperimentService:
                 record["experiment_id"] = str(option_id)
             if not record.get("experiment_id"):
                 record["experiment_id"] = uuid4().hex
+            record.setdefault("run_duration_days", run_duration_days)
+            if model_used:
+                record.setdefault("model_used", model_used)
             experiments.append(record)
         return experiments
 

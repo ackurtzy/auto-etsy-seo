@@ -22,6 +22,7 @@ class ExperimentState(str, Enum):
 
     PROPOSED = "proposed"
     TESTING = "testing"
+    FINISHED = "finished"
     REVERTED = "reverted"
     KEPT = "kept"
 

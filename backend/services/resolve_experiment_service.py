@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import date
+from datetime import date, timedelta
 from typing import Any, Dict, List, Optional
 
 import requests
@@ -69,6 +69,7 @@ class ResolveExperimentService:
 
         if not record.get("start_date"):
             record["start_date"] = date.today().isoformat()
+        self._ensure_planned_end_date(record)
         record["state"] = ExperimentState.TESTING.value
         self.repository.save_testing_experiment(self.shop_id, listing_id, record)
         self.repository.remove_untested_experiment(self.shop_id, listing_id, experiment_id)
@@ -113,6 +114,27 @@ class ResolveExperimentService:
         self.repository.clear_testing_experiment(self.shop_id, listing_id)
         return record
 
+    def extend_experiment(
+        self, listing_id: int, experiment_id: str, additional_days: int
+    ) -> Dict[str, Any]:
+        """Pushes the planned end date forward for a testing/finished experiment."""
+        record = self.repository.get_testing_experiment(self.shop_id, listing_id)
+        if not record or str(record.get("experiment_id")) != str(experiment_id):
+            raise ValueError(
+                f"Experiment {experiment_id} is not currently testing for listing {listing_id}."
+            )
+        planned = record.get("planned_end_date")
+        if not planned:
+            self._ensure_planned_end_date(record)
+            planned = record.get("planned_end_date")
+        try:
+            end_date = date.fromisoformat(planned)
+        except Exception:
+            end_date = date.today()
+        record["planned_end_date"] = (end_date + timedelta(days=additional_days)).isoformat()
+        self.repository.save_testing_experiment(self.shop_id, listing_id, record)
+        return record
+
     # ------------------------------------------------------------------ #
     # Experiment helpers
 
@@ -121,6 +143,20 @@ class ResolveExperimentService:
         if not changes:
             raise ValueError("Experiment lacks change data.")
         return changes[0]
+
+    def _ensure_planned_end_date(self, record: Dict[str, Any]) -> None:
+        """Derives planned_end_date if missing."""
+        if record.get("planned_end_date"):
+            return
+        start_value = record.get("start_date")
+        run_duration_days = record.get("run_duration_days") or 0
+        if not start_value or not run_duration_days:
+            return
+        try:
+            start_dt = date.fromisoformat(start_value)
+        except Exception:
+            return
+        record["planned_end_date"] = (start_dt + timedelta(days=int(run_duration_days))).isoformat()
 
     def _build_change_payload(
         self,

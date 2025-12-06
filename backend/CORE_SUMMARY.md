@@ -25,8 +25,9 @@ This file is the single source of context for anyone who needs to pick up work o
 - `experiments/` (the entire lifecycle state lives here):
   - `proposals.json`: the most recent bundle of exactly three options per listing (each option already has an `experiment_id`, hypothesis, payload, and cached listing/image snapshots).
   - `untested_experiments.json`: backlog dictionary `{listing_id: {experiment_id: record}}` populated when proposals are expanded; experiments stay here until manually accepted.
-  - `testing_experiments.json`: map of listing id → the single record currently being tested. Only one entry per listing is allowed.
-  - `tested_experiments.json`: map of listing id → list of completed experiments (state `kept` or `reverted`, `end_date`, evaluation results, etc.).
+- `testing_experiments.json`: map of listing id → the single record currently being tested. Only one entry per listing is allowed.
+- `tested_experiments.json`: map of listing id → list of completed experiments (state `kept` or `reverted`, `end_date`, evaluation results, etc.).
+- `experiment_settings.json`: defaults used when generating/accepting experiments (e.g., `run_duration_days`, `generation_model`, `tolerance`).
 - `reports.json`: ordered list of report objects (window metadata, Markdown report, insights array, referenced experiments, raw LLM payload).
 - `active_insights.json`: current insights selected by the user for reuse in future prompting. Reports keep their own copy so history is preserved even after removal from the active registry.
 - Additional folders (managed by the repository) cache images per listing and hold any archived files needed for reverts.
@@ -34,15 +35,16 @@ This file is the single source of context for anyone who needs to pick up work o
 ## Experiment Lifecycle & Guardrails
 1. **Sync** (`POST /sync`): Pull listings (with optional filters: limit, keywords, listing ids, sort order) and optionally sync the image manifests. Performance history is updated so baselines can be captured later.
 2. **Generate Proposals** (`POST /experiments/proposals`): For each listing id provided, the generate service fetches listing + top-three image snapshots, optional prior tested experiments (count limited by `max_prior_experiments`), and calls OpenAI for three single-variable ideas. IDs are assigned immediately so proposals, backlog entries, and future tests reference the same ID. Guardrails refuse to generate if the listing currently has an active test or any untested backlog experiments.
-3. **Select Proposal Option** (`POST /experiments/proposals/<listing_id>/select`): Requires an `experiment_id`. All three proposal options are expanded into serialized experiment records, saved in `untested_experiments.json`, and the proposal entry is deleted so new bundles cannot be generated until the queue is cleared. The chosen record can carry a specific `start_date` before being forwarded to the accept flow.
-4. **Accept / Apply Changes** (`POST /experiments/<listing>/<experiment>/accept`): Moves an experiment from the untested queue into testing. The resolve service ensures no other experiment is testing for that listing, builds the Etsy payload (respecting ≤13 tags, ≤20 characters per tag, comma-separated title clauses, etc.), archives images as needed, captures a baseline performance snapshot, applies the change through Etsy, refreshes listing images, sets `state=testing`, and writes the record to `testing_experiments.json` while removing it from the untested manifest.
+3. **Select Proposal Option** (`POST /experiments/proposals/<listing_id>/select`): Requires an `experiment_id`. All three proposal options are expanded into serialized experiment records (including `run_duration_days`, optional `model_used`, and cached listing/image snapshots), saved in `untested_experiments.json`, and the proposal entry is deleted so new bundles cannot be generated until the queue is cleared. The chosen record can carry a specific `start_date` before being forwarded to the accept flow.
+4. **Accept / Apply Changes** (`POST /experiments/<listing>/<experiment>/accept`): Moves an experiment from the untested queue into testing. The resolve service ensures no other experiment is testing for that listing, builds the Etsy payload (respecting ≤13 tags, ≤20 characters per tag, comma-separated title clauses, etc.), archives images as needed, captures a baseline performance snapshot, applies the change through Etsy, refreshes listing images, sets `state=testing`, stamps `planned_end_date` using `run_duration_days`, and writes the record to `testing_experiments.json` while removing it from the untested manifest.
 5. **Evaluate** (`POST /experiments/<listing>/<experiment>/evaluate`): Loads the experiment record, ensures a baseline exists (captured on accept), compares against the latest or requested date from `performance.json`, normalizes for whole-shop seasonality (comparison-date total views ÷ baseline total views), computes deltas, percentage changes, normalized deltas, z-score-based confidence, and a tolerance-aware recommended action (`keep`, `revert`, or `inconclusive`). Results are saved back to the experiment manifest (testing or tested).
-6. **Keep or Revert**: When the observation window is done, call either:
+6. **Finish / Extend**: When the planned end date arrives, the experiment is treated as `finished` while still residing in `testing_experiments.json`. You can extend the window (`POST /experiments/<listing>/<experiment>/extend`) or review a summary (`GET /experiments/<listing>/<experiment>/summary`) before deciding.
+7. **Keep or Revert**: When the observation window is done, call either:
    - `POST /experiments/<listing>/<experiment>/keep`: Marks the testing record as kept, stamps `end_date`, moves it into `tested_experiments.json`, and frees the listing for new proposals.
    - `POST /experiments/<listing>/<experiment>/revert`: Restores the original listing + image order from the cached snapshot, marks the record as `reverted`, sets `end_date`, and archives it in the tested manifest.
-7. **Reporting & Insight Activation**: Completed experiments (with `end_date`) can be rolled into reports, and the most valuable insights can be promoted into `active_insights.json` so future prompt runs can reuse them.
+8. **Reporting & Insight Activation**: Completed experiments (with `end_date`) can be rolled into reports, and the most valuable insights can be promoted into `active_insights.json` so future prompt runs can reuse them.
 
-States are explicit: `proposed` (proposals/untested), `testing`, `kept`, and `reverted`. The API enforces that each listing has at most one testing experiment, you cannot generate another proposal if untested experiments exist, and you cannot activate an untested experiment while another is in testing.
+States are explicit: `proposed` (proposals/untested), `testing`, `finished` (planned end reached but awaiting user decision), `kept`, and `reverted`. The API enforces that each listing has at most one testing/finished experiment, you cannot generate another proposal if untested experiments exist, and you cannot activate an untested experiment while another is in testing.
 
 ## Reporting & Insight Workflow
 - `POST /reports` accepts `{ "days_back": <int> }`, finds all tested experiments whose `end_date` falls within `[today - days_back, today]`, ensures each has up-to-date evaluation data (calling the evaluate service as needed), and constructs a compact payload per experiment:
@@ -58,10 +60,13 @@ States are explicit: `proposed` (proposals/untested), `testing`, `kept`, and `re
 
 ## API Surface (selected endpoints)
 - **Health & Sync**: `GET /health`, `POST /sync`.
-- **Listings**: `GET /listings`, `GET /listings/<listing_id>` (with query filters for IDs/title/state).
-- **Proposals**: `GET /experiments/proposals`, `POST /experiments/proposals`, `POST /experiments/proposals/<listing_id>/select`.
-- **Experiments**: `GET /experiments` (supports `listing_id` and `state` filters), `GET /experiments/testing`, `GET /experiments/untested`.
-- **Lifecycle Actions**: `POST /experiments/<listing>/<experiment>/accept`, `/keep`, `/revert`, `/evaluate`.
+- **Overview**: `GET /overview` aggregates counts/best/worst across active, finished, proposals, completed, and insights.
+- **Listings**: `GET /listings` (now includes listing preview + lifetime kept uplift), `GET /listings/<listing_id>` (with query filters for IDs/title/state).
+- **Images**: `GET /images/<listing_id>/<filename>` serves cached listing images for previews.
+- **Proposals**: `GET /experiments/proposals`, `POST /experiments/proposals`, `POST /experiments/proposals/<listing_id>/regenerate`, `POST /experiments/proposals/<listing_id>/select`.
+- **Experiments**: `GET /experiments` (supports `listing_id` and `state` filters), `GET /experiments/board` (tab-friendly inactive/proposals/active/finished/completed), `GET /experiments/testing`, `GET /experiments/finished`, `GET /experiments/untested`.
+- **Lifecycle Actions**: `POST /experiments/<listing>/<experiment>/accept`, `/keep`, `/revert`, `/evaluate`, `/extend`, plus `GET /experiments/<listing>/<experiment>/summary` for “end early” dialogs.
+- **Experiment defaults**: `GET/POST /experiments/settings` to persist `run_duration_days`, `generation_model`, and tolerance defaults used during proposal generation.
 - **Reporting & Insights**: `GET /reports`, `POST /reports`, `POST /reports/<report_id>/activate_insights`, `GET /insights/active`, `POST /insights/active/deactivate`, `DELETE /insights/active/<insight_id>`.
 - All responses are JSON; `JSON_SORT_KEYS` is disabled so payloads preserve ordering, and `flask_cors.CORS` is configured for `"/*"` origins so the local frontend works from any port.
 

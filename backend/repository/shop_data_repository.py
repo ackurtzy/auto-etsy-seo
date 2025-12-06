@@ -27,6 +27,7 @@ class ShopDataRepository:
         self._tested_cache: Dict[int, Dict[str, Any]] = {}
         self._reports_cache: Dict[int, List[Dict[str, Any]]] = {}
         self._active_insights_cache: Dict[int, List[Dict[str, Any]]] = {}
+        self._experiment_settings_cache: Dict[int, Dict[str, Any]] = {}
 
     def save_listings(self, shop_id: int, payload: Dict[str, Any]) -> str:
         """Persists listings payload and stores it in session cache.
@@ -440,6 +441,10 @@ class ShopDataRepository:
         folder_path = self._ensure_shop_folder(shop_id)
         return os.path.join(folder_path, "active_insights.json")
 
+    def _experiment_settings_path(self, shop_id: int) -> str:
+        folder_path = self._experiments_dir(shop_id)
+        return os.path.join(folder_path, "experiment_settings.json")
+
     # Experiment persistence -------------------------------------------------
 
     def _experiments_dir(self, shop_id: int) -> str:
@@ -467,6 +472,37 @@ class ShopDataRepository:
         self, shop_id: int, manifest: Dict[str, Any]
     ) -> Dict[str, Any]:
         return self._save_tested_manifest(shop_id, manifest)
+
+    # Experiment settings ---------------------------------------------------
+
+    def load_experiment_settings(self, shop_id: int) -> Dict[str, Any]:
+        """Loads persisted experiment defaults (duration, model, etc.)."""
+        if shop_id in self._experiment_settings_cache:
+            return self._experiment_settings_cache[shop_id]
+        path = self._experiment_settings_path(shop_id)
+        if os.path.exists(path):
+            settings_payload = file_lib.read_json(path)
+        else:
+            settings_payload = {}
+        self._experiment_settings_cache[shop_id] = settings_payload
+        return settings_payload
+
+    def get_experiment_settings(self, shop_id: int) -> Dict[str, Any]:
+        """Returns experiment settings merged with defaults."""
+        payload = dict(self.load_experiment_settings(shop_id) or {})
+        payload.setdefault("run_duration_days", 14)
+        payload.setdefault("generation_model", None)
+        payload.setdefault("tolerance", 0)
+        return payload
+
+    def save_experiment_settings(
+        self, shop_id: int, settings_payload: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Persists experiment defaults and caches them in memory."""
+        path = self._experiment_settings_path(shop_id)
+        file_lib.save_to_json(path, settings_payload)
+        self._experiment_settings_cache[shop_id] = settings_payload
+        return settings_payload
 
     # Reports and insights ---------------------------------------------------
 
