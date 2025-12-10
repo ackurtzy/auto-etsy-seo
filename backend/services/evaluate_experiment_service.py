@@ -62,14 +62,18 @@ class EvaluateExperimentService:
         normalized_current = (
             current_views / seasonality_factor if seasonality_factor else current_views
         )
-        normalized_delta = normalized_current - baseline_views
+        normalized_delta_views = normalized_current - baseline_views
+        normalized_delta = (
+            normalized_delta_views / baseline_views if baseline_views else None
+        )
 
         std_dev = math.sqrt(max(baseline_views, 1))
-        z_score = (normalized_current - baseline_views) / std_dev
+        z_score = normalized_delta_views / std_dev
         confidence = math.erf(abs(z_score) / math.sqrt(2))
 
-        recommended_action = "keep" if normalized_delta >= tolerance else "revert"
-        if abs(normalized_delta) <= tolerance:
+        comparison_value = normalized_delta if normalized_delta is not None else 0.0
+        recommended_action = "keep" if comparison_value >= tolerance else "revert"
+        if normalized_delta is None or abs(comparison_value) <= tolerance:
             recommended_action = "inconclusive"
 
         performance_meta["latest"] = {
@@ -79,6 +83,7 @@ class EvaluateExperimentService:
             "pct_change": pct_change,
             "seasonality_factor": seasonality_factor,
             "normalized_delta": normalized_delta,
+            "normalized_delta_views": normalized_delta_views,
             "confidence": confidence,
         }
         if source == "testing":
