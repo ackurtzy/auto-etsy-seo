@@ -87,6 +87,7 @@ class GenerateExperimentService:
         max_prior_experiments: int = 5,
         run_duration_days: Optional[int] = None,
         model_used: Optional[str] = None,
+        reasoning_level: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Generates proposals and persists the latest bundle for the listing."""
         if self.repository.get_testing_experiment(self.shop_id, listing_id):
@@ -104,6 +105,8 @@ class GenerateExperimentService:
             listing_id,
             include_prior_experiments=include_prior_experiments,
             max_prior_experiments=max_prior_experiments,
+            model_used=model_used,
+            reasoning_level=reasoning_level,
         )
         if run_duration_days is None:
             run_duration_days = DEFAULT_RUN_DURATION_DAYS
@@ -252,6 +255,8 @@ class GenerateExperimentService:
         listing_id: int,
         include_prior_experiments: bool,
         max_prior_experiments: int,
+        model_used: Optional[str] = None,
+        reasoning_level: Optional[str] = None,
     ) -> Dict[str, Any]:
         listing_snapshot = self.repository.get_listing_snapshot(self.shop_id, listing_id)
         if not listing_snapshot:
@@ -296,6 +301,8 @@ class GenerateExperimentService:
                 {"type": "input_text", "text": text_prompt},
                 *image_blocks,
             ],
+            model=model_used,
+            reasoning_level=reasoning_level,
         )
         experiment_payloads = response.get("experiments") or []
         if len(experiment_payloads) != 3:

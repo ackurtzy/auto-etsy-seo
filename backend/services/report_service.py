@@ -31,7 +31,13 @@ class ReportService:
 
         self.system_prompt = file_lib.read_txt_file(system_prompt_path).strip()
 
-    def generate_report(self, days_back: int = 30) -> Dict[str, Any]:
+    def generate_report(
+        self,
+        days_back: int = 30,
+        *,
+        model: Optional[str] = None,
+        reasoning_level: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Builds a report for experiments ending within the window."""
         window_end = date.today()
         window_start = window_end - timedelta(days=days_back)
@@ -93,6 +99,8 @@ class ReportService:
                     ),
                 },
             ],
+            model=model,
+            reasoning_level=reasoning_level,
         )
 
         raw_insights = response.get("insights") or []

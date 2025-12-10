@@ -85,6 +85,9 @@ class ResolveExperimentService:
         record["end_date"] = date.today().isoformat()
         self.repository.append_tested_experiment(self.shop_id, listing_id, record)
         self.repository.clear_testing_experiment(self.shop_id, listing_id)
+        # Once fully resolved, clear any remaining untested backlog so the listing
+        # can re-enter the inactive pool and be eligible for new proposals.
+        self.repository.clear_untested_experiments(self.shop_id, listing_id)
         return record
 
     def revert_experiment(self, listing_id: int, experiment_id: str) -> Dict[str, Any]:
@@ -112,6 +115,9 @@ class ResolveExperimentService:
         record["end_date"] = date.today().isoformat()
         self.repository.append_tested_experiment(self.shop_id, listing_id, record)
         self.repository.clear_testing_experiment(self.shop_id, listing_id)
+        # Clear any remaining untested backlog for this listing so it becomes
+        # eligible for new proposals again.
+        self.repository.clear_untested_experiments(self.shop_id, listing_id)
         return record
 
     def extend_experiment(

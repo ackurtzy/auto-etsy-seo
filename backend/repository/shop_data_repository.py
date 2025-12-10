@@ -677,6 +677,17 @@ class ShopDataRepository:
         self._save_untested_manifest(shop_id, manifest)
         return record
 
+    def clear_untested_experiments(
+        self,
+        shop_id: int,
+        listing_id: int,
+    ) -> None:
+        """Removes all untested experiments for a listing."""
+        manifest = self._load_untested_manifest(shop_id)
+        if str(listing_id) in manifest:
+            manifest.pop(str(listing_id), None)
+            self._save_untested_manifest(shop_id, manifest)
+
     def get_untested_experiment(
         self, shop_id: int, listing_id: int, experiment_id: str
     ) -> Optional[Dict[str, Any]]:

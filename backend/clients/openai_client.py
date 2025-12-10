@@ -25,6 +25,9 @@ class OpenAIClient:
         self,
         system_prompt: str,
         user_content: List[Dict[str, Any]],
+        *,
+        model: str | None = None,
+        reasoning_level: str | None = None,
     ) -> Dict[str, Any]:
         """Sends a request to the responses endpoint enforcing JSON output."""
         if not self.api_key:
@@ -34,8 +37,11 @@ class OpenAIClient:
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        effective_model = model or self.model
+        effective_reasoning = reasoning_level or self.reasoning_level
+
         body: Dict[str, Any] = {
-            "model": self.model,
+            "model": effective_model,
             "input": [
                 {
                     "role": "system",
@@ -44,8 +50,8 @@ class OpenAIClient:
                 {"role": "user", "content": user_content},
             ],
         }
-        if self.reasoning_level and self.reasoning_level.lower() != "none":
-            body["reasoning"] = {"effort": self.reasoning_level}
+        if effective_reasoning and effective_reasoning.lower() != "none":
+            body["reasoning"] = {"effort": effective_reasoning}
         body["text"] = {"format": {"type": "text"}}
 
         response = requests.post(

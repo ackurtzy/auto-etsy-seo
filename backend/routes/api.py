@@ -550,15 +550,75 @@ def experiments_board():
         listing_id = int(listing_id_str)
         if not matches_search(listing_id):
             continue
+        listing_record = listing_map.get(listing_id) or {}
+        images_snapshot = repository.get_listing_images_snapshot(
+            settings.shop_id, listing_id
+        ) or {}
+        files = images_snapshot.get("files") or []
+
+        def _image_sort_key(entry: Dict[str, Any]) -> int:
+            rank = entry.get("rank")
+            try:
+                return int(rank) if rank is not None else 9999
+            except (TypeError, ValueError):
+                return 9999
+
+        files_sorted = sorted(files, key=_image_sort_key)
+        original_order: List[int] = []
+        thumbnail_images: List[Dict[str, Any]] = []
+
+        for file_entry in files_sorted:
+            image_id = file_entry.get("listing_image_id")
+            if image_id is None:
+                continue
+            path = file_entry.get("path")
+            url: Optional[str] = None
+            if path:
+                filename = os.path.basename(path)
+                url = f"/images/{listing_id}/{filename}"
+            thumbnail_images.append(
+                {
+                    "listing_image_id": image_id,
+                    "url": url,
+                }
+            )
+            original_order.append(int(image_id))
+
+        if not thumbnail_images:
+            remote_results = sorted(
+                images_snapshot.get("results") or [], key=_image_sort_key
+            )
+            for result in remote_results:
+                image_id = result.get("listing_image_id")
+                if image_id is None:
+                    continue
+                url = result.get("url_170x135") or result.get("url_75x75") or result.get(
+                    "url_fullxfull"
+                )
+                thumbnail_images.append(
+                    {
+                        "listing_image_id": image_id,
+                        "url": url,
+                    }
+                )
+                original_order.append(int(image_id))
+
+        original_order = original_order[:3]
+
         proposal_results.append(
             {
                 "listing_id": listing_id,
                 "generated_at": proposal.get("generated_at"),
                 "option_count": len(proposal.get("options") or []),
+                "options": proposal.get("options") or [],
                 "run_duration_days": proposal.get("run_duration_days"),
                 "model_used": proposal.get("model_used"),
+                "original_title": listing_record.get("title"),
+                "original_description": listing_record.get("description"),
+                "original_thumbnail_order": original_order,
+                "thumbnail_images": thumbnail_images,
                 "preview": _listing_preview(
-                    repository, listing_id, listing_map.get(listing_id)
+                    repository, listing_id, listing_record
                 ),
             }
         )
@@ -573,6 +633,11 @@ def experiments_board():
         if not matches_search(listing_id):
             continue
         _evaluate_record(listing_id, record)
+        change_types = [
+            change.get("change_type")
+            for change in (record.get("changes") or [])
+            if change.get("change_type")
+        ]
         active_results.append(
             {
                 "listing_id": listing_id,
@@ -583,6 +648,7 @@ def experiments_board():
                 "run_duration_days": record.get("run_duration_days"),
                 "model_used": record.get("model_used"),
                 "performance": record.get("performance"),
+                "change_types": change_types,
                 "preview": _listing_preview(
                     repository, listing_id, listing_map.get(listing_id)
                 ),
@@ -597,6 +663,11 @@ def experiments_board():
         if not matches_search(listing_id):
             continue
         _evaluate_record(listing_id, record)
+        change_types = [
+            change.get("change_type")
+            for change in (record.get("changes") or [])
+            if change.get("change_type")
+        ]
         finished_results.append(
             {
                 "listing_id": listing_id,
@@ -607,6 +678,7 @@ def experiments_board():
                 "run_duration_days": record.get("run_duration_days"),
                 "model_used": record.get("model_used"),
                 "performance": record.get("performance"),
+                "change_types": change_types,
                 "preview": _listing_preview(
                     repository, listing_id, listing_map.get(listing_id)
                 ),
@@ -622,6 +694,11 @@ def experiments_board():
         if not matches_search(listing_id):
             continue
         for record in records:
+            change_types = [
+                change.get("change_type")
+                for change in (record.get("changes") or [])
+                if change.get("change_type")
+            ]
             completed_results.append(
                 {
                     "listing_id": listing_id,
@@ -629,6 +706,7 @@ def experiments_board():
                     "state": record.get("state"),
                     "end_date": record.get("end_date"),
                     "performance": record.get("performance"),
+                    "change_types": change_types,
                     "preview": _listing_preview(
                         repository, listing_id, listing_map.get(listing_id)
                     ),
@@ -702,6 +780,18 @@ def create_proposals():
         or payload.get("model_used")
         or settings_payload.get("generation_model")
     )
+    reasoning_level = (
+        payload.get("reasoning_level")
+        or settings_payload.get("reasoning_level")
+    )
+    reasoning_level = (
+        payload.get("reasoning_level")
+        or settings_payload.get("reasoning_level")
+    )
+    reasoning_level = (
+        payload.get("reasoning_level")
+        or settings_payload.get("reasoning_level")
+    )
 
     results: List[Dict[str, Any]] = []
     errors: List[Dict[str, Any]] = []
@@ -731,6 +821,7 @@ def create_proposals():
                 max_prior_experiments=max_prior,
                 run_duration_days=run_duration_days or None,
                 model_used=model_used,
+                reasoning_level=reasoning_level,
             )
             repository.save_proposal(settings.shop_id, listing_id, proposal)
             results.append(
@@ -807,6 +898,7 @@ def regenerate_proposal(listing_id: int):
             max_prior_experiments=max_prior,
             run_duration_days=run_duration_days or None,
             model_used=model_used,
+            reasoning_level=reasoning_level,
         )
         repository.save_proposal(settings.shop_id, listing_id, proposal)
         return jsonify(
@@ -836,6 +928,8 @@ def experiment_settings():
             return jsonify({"error": "run_duration_days must be an integer."}), 400
     if "generation_model" in payload:
         current["generation_model"] = payload.get("generation_model")
+    if "reasoning_level" in payload:
+        current["reasoning_level"] = payload.get("reasoning_level")
     if "tolerance" in payload:
         try:
             current["tolerance"] = float(payload.get("tolerance") or 0)
@@ -1174,8 +1268,14 @@ def generate_experiment_report():
     report_service: ReportService = components["report_service"]
     payload = request.get_json(silent=True) or {}
     days_back = int(payload.get("days_back") or 30)
+    model = payload.get("model")
+    reasoning_level = payload.get("reasoning_level")
     try:
-        report = report_service.generate_report(days_back=days_back)
+        report = report_service.generate_report(
+            days_back=days_back,
+            model=model,
+            reasoning_level=reasoning_level,
+        )
         return jsonify(report)
     except Exception as exc:
         LOGGER.exception("Failed to generate experiment report.")
