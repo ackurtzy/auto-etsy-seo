@@ -234,7 +234,7 @@ const ListingThumbnail = ({
   >
     <img 
       src={getImageUrl(preview.primary_image_url)} 
-      alt={preview.title} 
+      alt={decodeHtmlEntities(preview.title)} 
       className="w-12 h-12 object-cover rounded border border-gray-200"
     />
     <div>
@@ -242,7 +242,7 @@ const ListingThumbnail = ({
         className="font-sans text-sm font-medium text-gray-900 group-hover:text-[color:var(--primary)] max-w-xs leading-snug line-clamp-2"
         style={{ '--primary': COLORS.primary } as any}
       >
-        {preview.title}
+        {decodeHtmlEntities(preview.title)}
       </h4>
       <span className="text-xs text-gray-500">ID: {preview.listing_id}</span>
     </div>
@@ -2781,7 +2781,6 @@ export default function App() {
     setSyncing(true);
     try {
       await api.post('/sync');
-      alert('Sync complete!');
       const current = `${location.pathname}${location.search}`;
       routerNavigate('/');
       setTimeout(() => routerNavigate(current), 50);
