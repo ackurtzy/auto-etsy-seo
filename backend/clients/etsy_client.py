@@ -222,8 +222,11 @@ class EtsyClient:
     ) -> requests.Response:
         headers = self._build_headers()
         response = sender(headers)
-        if response.status_code == 401:
-            LOGGER.info("Access token expired, refreshing.")
+        if response.status_code in {401, 403}:
+            LOGGER.info(
+                "Etsy request returned %s, refreshing token and retrying once.",
+                response.status_code,
+            )
             self.key_store.refresh(self.session)
             headers = self._build_headers()
             response = sender(headers)
@@ -247,8 +250,11 @@ class EtsyClient:
             timeout=self.timeout,
         )
 
-        if response.status_code == 401:
-            LOGGER.info("Access token expired, refreshing.")
+        if response.status_code in {401, 403}:
+            LOGGER.info(
+                "Etsy request returned %s, refreshing token and retrying once.",
+                response.status_code,
+            )
             self.key_store.refresh(self.session)
             headers = self._build_headers()
             response = self.session.request(
@@ -265,9 +271,16 @@ class EtsyClient:
 
     def _build_headers(self) -> Dict[str, str]:
         keys = self.key_store._require_keys()
+        shared_secret = (
+            (keys.get("shared_secret") or keys.get("sharedSecret") or "").strip()
+        )
+        x_api_key = keys["keystring"]
+        if shared_secret:
+            # Etsy currently expects x-api-key as "<keystring>:<shared_secret>".
+            x_api_key = f"{x_api_key}:{shared_secret}"
         return {
             "Authorization": f"Bearer {keys['access_token']}",
-            "x-api-key": keys["keystring"],
+            "x-api-key": x_api_key,
         }
 
     def _normalize_data(self, data: Dict[str, Any]) -> Any:
