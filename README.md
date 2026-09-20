@@ -1,86 +1,41 @@
 # Auto Etsy SEO
 
-Full-stack dashboard for managing Etsy listing experiments,
-proposal generation, and analytics. The backend simulates Etsy data
-and exposes a Flask API; the frontend is a React + Vite single-page
-app that consumes the API.
+Auto Etsy SEO is being rebuilt as a gated, independent Etsy listing experiment
+product. The authoritative implementation source is identified by
+`docs/rebuild/plan-source.json`.
 
-## Project structure
+## Current state
 
-```
-auto-etsy-seo/
-├── backend/      # Flask API, services, Etsy data snapshots
-├── frontend/     # React UI (Vite, TypeScript, Tailwind)
-└── README.md
-```
+Only Phase 0 is implemented. It provides a credential-free safety harness,
+permission and retention records, capability defaults, the owner H0 procedure,
+and a hard quarantine around the v1 Etsy/OpenAI clients.
 
-### Backend
+Nothing in this branch authorizes or enables live Etsy reads, Etsy writes, AI
+processing, invited shops, randomized experiments, or production deployment.
+H0 remains `not_run` in `docs/gates/G0.json`.
 
-- Entry point: `backend/routes/api.py` (Flask app)
-- Data snapshots under `backend/data/<shop_id>/...`
-- Key services:
-  - `services/generate_experiment_service.py` – proposal generation
-  - `services/resolve_experiment_service.py` – keep/revert behavior
-  - `services/evaluate_experiment_service.py` – performance calcs
-- `requirements.txt` for dependencies (Flask, etc.)
-
-**Running the backend**
+Run the safe gate locally:
 
 ```bash
-cd backend
-source venv/bin/activate  # if virtualenv exists
-pip install -r requirements.txt
-FLASK_APP=routes/api.py flask run --reload
+PYTHONDONTWRITEBYTECODE=1 python3 validation/phase0/validate_phase0.py
 ```
 
-### Frontend
+## Legacy runtime
 
-- TypeScript React app bootstrapped with Vite
-- Uses `tailwindcss` for styling and `react-router-dom` for routing
-- API base is `http://localhost:8000`
+The former Flask/React implementation is preserved at Git tag
+`legacy-v1-2026-09-20` for audit and recovery. Its server, manual scripts, Etsy
+client, and OpenAI client are intentionally non-executable on this rebuild
+branch. Do not use old launch commands or live-write scripts as regression
+tests.
 
-**Running the frontend**
+Legacy ignored data and credentials remain local. They are not new-system
+fixtures, do not establish current Etsy state, and must not be committed or
+placed in an unencrypted shared archive.
 
-```bash
-cd frontend
-npm install
-npm run dev
-```
+## Next gate
 
-### Sync + data workflow
-
-1. **Sync** (`POST /sync`) pulls latest Etsy snapshots into
-   `backend/data/...` (listings, images, performance history).
-2. **Proposals** (`POST /experiments/proposals`) generate up to 3
-   options per listing (title/tags/description/thumbnail).
-3. **Testing lifecycle**: Inactive → Proposals → Active (testing) →
-   Finished → Completed. The frontend tabs mirror this flow.
-4. **Evaluation** (`POST /experiments/<listing>/<experiment>/evaluate`)
-   writes performance metrics back to the experiment record.
-
-### Notable commands/API endpoints
-
-| Endpoint/Command | Description |
-| ---------------- | ----------- |
-| `POST /sync` | Refresh cached Etsy data |
-| `GET/POST /experiments/settings` | Update defaults (duration/model/tolerance) |
-| `POST /experiments/proposals` | Generate new experiment proposals |
-| `POST /experiments/proposals/<listing_id>/select` | Start an experiment |
-| `POST /experiments/<listing_id>/<experiment_id>/keep|revert|extend` | Resolve or adjust a running experiment |
-| `POST /experiments/<listing_id>/<experiment_id>/evaluate` | Calculate performance delta |
-| `POST /reports` | Generate an LLM-backed performance report |
-
-### Environment variables / Config
-
-- `backend/config.py` reads Etsy shop settings (shop ID, keys).
-- OpenAI API key used for proposal/report generation (see
-  `backend/clients/openai_client.py`).
-
-### Notes
-
-- Sample data lives under `backend/data/23574688/...`, so the app
-  works offline by default.
-- `backend/CORE_SUMMARY.md` documents the high-level architecture.
-- Frontend styling/patterns are summarized in
-  `frontend/docs/ui_guidelines.md`.
-
+The owner completes `docs/rebuild/owner-h0-checklist.md` against the actual Etsy
+developer application records. Scope-sensitive identifiers and evidence belong
+in the ignored `docs/gates/private/` location; only redacted hashes and status
+belong in tracked gate records. Phase 1 may begin live read-only reconciliation
+only after that gate is passed for an exact scope.

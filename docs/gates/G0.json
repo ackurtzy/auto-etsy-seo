@@ -1,0 +1,41 @@
+{
+  "gate_id": "G0",
+  "scope": {
+    "tenant_id": null,
+    "shop_id": null,
+    "capability": "permission_boundary",
+    "trust_level": "T0",
+    "method_profile": null
+  },
+  "status": "not_run",
+  "repository_commit": null,
+  "deployed_build": null,
+  "contract_versions": {"phase0_records": "1.0", "egress_guard": "1.0"},
+  "automated_evidence": [
+    {
+      "test_id": "A0",
+      "result": "passed",
+      "environment": "credential-free local and CI harness",
+      "artifact": "validation/phase0/a0-results.json",
+      "sha256": "0c1969e30ae67e321d912894599bfefaed22285c74041ecab3d08e0c90506eb7"
+    }
+  ],
+  "human_evidence": [],
+  "owner_approver": null,
+  "approved_at": null,
+  "limitations": [
+    "H0 owner review has not run.",
+    "No live reads or writes are authorized."
+  ],
+  "explicitly_disabled_capabilities": [
+    "all_live_reads",
+    "all_etsy_writes",
+    "ai_processing",
+    "external_shop_onboarding",
+    "randomized_experiments",
+    "automation"
+  ],
+  "canary_permit_reference": null,
+  "release_enablement_authorized": false,
+  "notes": "Phase 0 starts fail closed. Only owner-reviewed evidence may advance G0."
+}

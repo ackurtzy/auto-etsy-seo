@@ -1,0 +1,19 @@
+name: Phase 0 safety gate
+
+on:
+  pull_request:
+  push:
+
+permissions:
+  contents: read
+
+jobs:
+  phase0:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate credential-free gate
+        run: python3 validation/phase0/validate_phase0.py

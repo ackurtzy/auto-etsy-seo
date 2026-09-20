@@ -1,0 +1,9 @@
+{
+  "schema_version": "1.0",
+  "status": "credential_free_only",
+  "synthetic_samples": [
+    {"fixture": "synthetic_listing", "path": "validation/phase0/fixtures/synthetic_listing.json", "contains_buyer_data": false}
+  ],
+  "owner_selected_live_samples": [],
+  "rule": "Live sample IDs belong only in the protected gate record after H0 approval."
+}

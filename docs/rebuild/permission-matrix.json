@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "status": "requires_owner_review",
+  "rule": "No token or existing access is treated as authorization by itself.",
+  "activities": [
+    {"activity": "own_shop_listing_reads", "status": "unresolved", "enabled": false, "required_evidence": "Etsy application purpose and access record"},
+    {"activity": "own_shop_outcome_reads", "status": "unresolved", "enabled": false, "required_evidence": "Approved analytics purpose, scopes, and source contract"},
+    {"activity": "own_shop_title_or_tag_writes", "status": "unresolved", "enabled": false, "required_evidence": "G3a plus exact owner-authorized live canary"},
+    {"activity": "external_shop_onboarding", "status": "unresolved", "enabled": false, "required_evidence": "Commercial access and invited-shop authorization"},
+    {"activity": "openai_processing", "status": "unresolved", "enabled": false, "required_evidence": "Approved vendor, data fields, purpose, and retention"},
+    {"activity": "resend_notifications", "status": "unresolved", "enabled": false, "required_evidence": "Approved notification data and destination"},
+    {"activity": "cloudflare_persistence", "status": "unresolved", "enabled": false, "required_evidence": "Approved stored fields, region/account, and retention"},
+    {"activity": "legacy_runtime", "status": "retired", "enabled": false, "required_evidence": "Not eligible for re-enablement; recover from legacy tag only for audit"}
+  ]
+}

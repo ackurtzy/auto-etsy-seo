@@ -6,6 +6,10 @@ import json
 import logging
 from pathlib import Path
 
+from legacy_runtime_guard import assert_legacy_runtime_disabled
+
+assert_legacy_runtime_disabled("backend/testing.py")
+
 from clients.etsy_client import EtsyClient
 from repository.shop_data_repository import ShopDataRepository
 from services.sync_service import SyncService

@@ -1,0 +1,14 @@
+{
+  "schema_version": "1.0",
+  "status": "phase_0_all_disabled",
+  "capabilities": [
+    {"capability": "listing_read", "runtime_enabled": false, "next_gate": "G1"},
+    {"capability": "outcome_read", "runtime_enabled": false, "next_gate": "G1"},
+    {"capability": "title_write", "runtime_enabled": false, "next_gate": "G3b-title"},
+    {"capability": "tags_write", "runtime_enabled": false, "next_gate": "G3b-tags"},
+    {"capability": "directional_experiment", "runtime_enabled": false, "next_gate": "G4"},
+    {"capability": "randomized_group_experiment", "runtime_enabled": false, "next_gate": "G5"},
+    {"capability": "bounded_autonomy", "runtime_enabled": false, "next_gate": "G6"},
+    {"capability": "images_description_video_price_shipping_returns", "runtime_enabled": false, "next_gate": "independent_G7"}
+  ]
+}

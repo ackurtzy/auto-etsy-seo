@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "gate": "A0",
+  "status": "passed",
+  "method_version": "phase0-a0-v1",
+  "fixture_version": "synthetic-listing-v1",
+  "repository_baseline": "8c8ecd11341764dc31c03692acdc061d8584e329",
+  "implementation_revision": "pending_phase0_commit",
+  "scope": "credential-free fixtures and default-deny egress only",
+  "external_requests": 0,
+  "credentials_required": false,
+  "assertions": [
+    "default configuration denies live egress before network I/O",
+    "nonallowlisted listing scope is denied",
+    "write methods are denied",
+    "non-Etsy destinations are denied",
+    "all legacy entrypoints are quarantined",
+    "all live capabilities remain disabled",
+    "fixture safety scan detects no credential or email-like PII"
+  ],
+  "failures": [],
+  "limitations": [
+    "H0 owner review has not run",
+    "no Etsy, model-provider, Clerk, Resend, or Cloudflare integration was contacted",
+    "this result does not enable live reads or writes"
+  ]
+}

@@ -10,6 +10,10 @@ from pathlib import Path
 from typing import Any, Dict, List
 from uuid import uuid4
 
+from legacy_runtime_guard import assert_legacy_runtime_disabled
+
+assert_legacy_runtime_disabled("backend/testing_listing_changes.py")
+
 from clients.etsy_client import EtsyClient
 from models.listing_change import (
     DescriptionChange,

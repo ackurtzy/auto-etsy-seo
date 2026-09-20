@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0",
+  "status": "pending_owner_archive_and_process_inventory",
+  "source_commit": "8c8ecd11341764dc31c03692acdc061d8584e329",
+  "archive_tag": "legacy-v1-2026-09-20",
+  "retired_entrypoints": [
+    "backend/routes/api.py",
+    "backend/testing.py",
+    "backend/testing_listing_changes.py",
+    "backend/testing_pipeline.py"
+  ],
+  "retired_client_boundaries": [
+    "backend/clients/etsy_client.py:EtsyKeyStore",
+    "backend/clients/etsy_client.py:EtsyClient",
+    "backend/clients/openai_client.py:OpenAIClient"
+  ],
+  "shutdown_before_first_new_write": [
+    "confirm no legacy Flask process is running",
+    "confirm no scheduler or shell automation launches a retired entrypoint",
+    "confirm no other application is authorized to write the canary listing",
+    "record the result in the protected G3 canary record"
+  ],
+  "local_archive": {
+    "status": "pending_owner_controlled_destination",
+    "rule": "Never copy keys.json into the repository or a plaintext shared artifact.",
+    "legacy_conclusions_imported": false
+  }
+}

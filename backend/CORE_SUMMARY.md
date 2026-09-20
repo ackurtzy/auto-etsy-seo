@@ -1,5 +1,11 @@
 # Core Summary
 
+> **Legacy audit document only.** The v1 Flask runtime, Etsy client, OpenAI
+> client, and manual scripts are hard-disabled on the rebuild branch. The
+> behavior below is preserved for archaeology and must not be launched or used
+> as a regression workflow. See the `legacy-v1-2026-09-20` tag for runnable
+> historical source.
+
 This file is the single source of context for anyone who needs to pick up work on the Auto Etsy SEO project. It captures how the backend services, persistence model, reporting workflow, and MVP frontend interact so the system can be paused and resumed seamlessly in a new session.
 
 ## Mission & Operating Model

@@ -14,6 +14,10 @@ PROJECT_ROOT = os.path.dirname(CURRENT_DIR)
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
+from legacy_runtime_guard import assert_legacy_runtime_disabled
+
+assert_legacy_runtime_disabled("backend/routes/api.py")
+
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 

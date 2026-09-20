@@ -7,6 +7,10 @@ import logging
 from pathlib import Path
 from typing import List
 
+from legacy_runtime_guard import assert_legacy_runtime_disabled
+
+assert_legacy_runtime_disabled("backend/testing_pipeline.py")
+
 from clients.etsy_client import EtsyClient
 from repository.shop_data_repository import ShopDataRepository
 from services.generate_experiment_service import GenerateExperimentService

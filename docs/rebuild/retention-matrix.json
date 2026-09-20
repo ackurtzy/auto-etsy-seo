@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "status": "proposed_not_approved",
+  "rule": "These are ceilings, not a claim of permission. Shorter approved limits win.",
+  "classes": [
+    {"data_class": "redacted_diagnostics", "proposed_max_days": 7, "live_processing_enabled": false},
+    {"data_class": "operational_logs", "proposed_max_days": 30, "live_processing_enabled": false},
+    {"data_class": "encrypted_backups", "proposed_max_days": 30, "live_processing_enabled": false},
+    {"data_class": "deidentified_experiment_evidence", "proposed_max_days_after_close": 365, "live_processing_enabled": false},
+    {"data_class": "oauth_tokens", "retention": "connection_lifetime_then_delete", "live_processing_enabled": false},
+    {"data_class": "buyer_identity_address_email_notes_personalization", "retention": "never_store", "live_processing_enabled": false},
+    {"data_class": "legacy_local_runtime_data", "retention": "owner_controlled_archive_pending", "live_processing_enabled": false}
+  ],
+  "deletion_target_hours": 24,
+  "backup_restore_rule": "Restore in isolation with Etsy egress disabled; overlay deletion and revocation records before any authorization."
+}

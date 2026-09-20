@@ -1,0 +1,27 @@
+# Rebuild validation and Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local credentials and environment
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Tool state and generated output
+.wrangler/
+coverage/
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# Legacy private/runtime state remains local
+backend/keys.json
+backend/data/
+backend/venv/
+
+# Owner-controlled gate evidence may contain scope-sensitive identifiers.
+docs/gates/private/

@@ -9,6 +9,7 @@ from typing import Any, Dict, List
 import requests
 
 from config import settings
+from legacy_runtime_guard import assert_legacy_runtime_disabled
 
 
 @dataclass
@@ -20,6 +21,9 @@ class OpenAIClient:
     reasoning_level: str = settings.openai.reasoning_level
     api_base: str = "https://api.openai.com/v1"
     timeout: int = 180
+
+    def __post_init__(self) -> None:
+        assert_legacy_runtime_disabled("backend/clients/openai_client.py:OpenAIClient")
 
     def generate_json_response(
         self,

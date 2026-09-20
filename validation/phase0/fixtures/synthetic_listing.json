@@ -1,0 +1,8 @@
+{
+  "fixture_version": "1.0",
+  "shop_id": "synthetic-shop",
+  "listing_id": "synthetic-listing",
+  "title": "Synthetic stationery listing",
+  "tags": ["synthetic tag"],
+  "contains_buyer_data": false
+}

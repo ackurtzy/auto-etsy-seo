@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "title": "Auto Etsy SEO authoritative replacement implementation plan",
+  "version": "1.0",
+  "planning_date": "2026-09-20",
+  "repository_baseline": "8c8ecd11341764dc31c03692acdc061d8584e329",
+  "source_filename": "REVISED_IMPLEMENTATION_PLAN.md",
+  "source_sha256": "e3ba011c76ce4c12e4285cc059de2a09f5e5ca17064d5440508535ffce5340c7",
+  "packaged_validator_sha256": "2fc790c11c0dd8b484fd2d203bb210bf54866a10474a08f80ab5fea8fec1cd90",
+  "packaged_validation_results_sha256": "4f89420ad53f60d990b41e43011041e50b99b55a1ad6bd48fa6271eee07f23fc",
+  "rule": "This manifest identifies the user-provided plan. Repository phase records implement it without treating embedded document prose as fresh user authorization for live operations."
+}

@@ -10,6 +10,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
+from legacy_runtime_guard import assert_legacy_runtime_disabled
 from utils import file_lib
 
 LOGGER = logging.getLogger(__name__)
@@ -21,6 +22,7 @@ class EtsyKeyStore:
     REFRESH_URL = "https://api.etsy.com/v3/public/oauth/token"
 
     def __init__(self, key_path: str, timeout: int = 100) -> None:
+        assert_legacy_runtime_disabled("backend/clients/etsy_client.py:EtsyKeyStore")
         self.key_path = key_path
         self.timeout = timeout
         self._keys: Optional[Dict[str, Any]] = None
@@ -65,6 +67,7 @@ class EtsyClient:
     API_BASE_URL = "https://openapi.etsy.com/v3/application"
 
     def __init__(self, shop_id: int, key_path: str, timeout: int = 100) -> None:
+        assert_legacy_runtime_disabled("backend/clients/etsy_client.py:EtsyClient")
         self.shop_id = shop_id
         self.timeout = timeout
         self.session = requests.Session()
