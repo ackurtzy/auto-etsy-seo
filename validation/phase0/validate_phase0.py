@@ -183,6 +183,32 @@ def main() -> int:
     )
     if revision_check.returncode != 0:
         raise AssertionError("A0 implementation revision is not an ancestor of the checked-out commit")
+    changed_since_evidence = subprocess.run(
+        [git_binary(), "diff", "--name-only", f"{a0['implementation_revision']}..HEAD"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    evidence_only_paths = {
+        "docs/gates/G0.json",
+        "validation/phase0/a0-results.json",
+    }
+    unexpected_changes = set(changed_since_evidence).difference(evidence_only_paths)
+    if unexpected_changes:
+        raise AssertionError(
+            "A0 evidence is stale for implementation changes: "
+            + ", ".join(sorted(unexpected_changes))
+        )
+    worktree_status = subprocess.run(
+        [git_binary(), "status", "--porcelain", "--untracked-files=all"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    if worktree_status:
+        raise AssertionError("A0 evidence validation requires a clean reviewed worktree")
     g0_evidence = next((item for item in g0["automated_evidence"] if item["test_id"] == "A0"), None)
     if g0_evidence is None:
         raise AssertionError("G0 does not reference A0 evidence")
