@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 
@@ -57,6 +58,25 @@ def scan_text_file(path: Path) -> None:
     for label, pattern in PROHIBITED_FIXTURE_PATTERNS.items():
         if pattern.search(content):
             raise AssertionError(f"fixture safety scan found {label} in {path.relative_to(ROOT)}")
+
+
+def git_binary() -> str:
+    bundled = (
+        Path.home()
+        / ".cache"
+        / "codex-runtimes"
+        / "codex-primary-runtime"
+        / "dependencies"
+        / "bin"
+        / "fallback"
+        / "git"
+    )
+    if bundled.is_file():
+        return str(bundled)
+    executable = shutil.which("git")
+    if executable is None:
+        raise AssertionError("Git is required to bind A0 evidence to a revision")
+    return executable
 
 
 def main() -> int:
@@ -150,6 +170,19 @@ def main() -> int:
     if a0["status"] != "passed" or a0["failures"] or a0["external_requests"] != 0:
         raise AssertionError("checked-in A0 result does not describe a clean credential-free pass")
     g0 = load_json(ROOT / "docs" / "gates" / "G0.json")
+    if g0.get("repository_commit") != a0["implementation_revision"]:
+        raise AssertionError("G0 and A0 do not identify the same implementation revision")
+    if not re.fullmatch(r"[a-f0-9]{40}", a0["implementation_revision"]):
+        raise AssertionError("A0 implementation revision is not a full commit SHA")
+    revision_check = subprocess.run(
+        [git_binary(), "merge-base", "--is-ancestor", a0["implementation_revision"], "HEAD"],
+        cwd=ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if revision_check.returncode != 0:
+        raise AssertionError("A0 implementation revision is not an ancestor of the checked-out commit")
     g0_evidence = next((item for item in g0["automated_evidence"] if item["test_id"] == "A0"), None)
     if g0_evidence is None:
         raise AssertionError("G0 does not reference A0 evidence")
