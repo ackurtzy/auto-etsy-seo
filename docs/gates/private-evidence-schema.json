@@ -3,7 +3,7 @@
   "title": "Private owner gate evidence",
   "type": "object",
   "additionalProperties": false,
-  "required": ["gate_id", "status", "approved_scope", "owner_approver", "approved_at", "expires_at", "evidence"],
+  "required": ["gate_id", "status", "approved_scope", "owner_approver", "approved_at", "expires_at", "evidence", "owner_signature"],
   "properties": {
     "gate_id": {"type": "string", "pattern": "^G[0-7]"},
     "status": {"enum": ["failed", "passed", "passed_with_explicitly_disabled_capabilities"]},
@@ -21,6 +21,22 @@
     "owner_approver": {"type": "string", "minLength": 1},
     "approved_at": {"type": "string", "format": "date-time"},
     "expires_at": {"type": "string", "format": "date-time"},
-    "evidence": {"type": "array", "minItems": 1, "items": {"type": "object"}}
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["artifact_id", "sha256", "source_type", "reviewed_at", "result"],
+        "properties": {
+          "artifact_id": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+          "source_type": {"enum": ["etsy_application_record", "vendor_policy", "owner_scope_record", "retention_review", "process_inventory"]},
+          "reviewed_at": {"type": "string", "format": "date-time"},
+          "result": {"enum": ["supports_scope", "blocks_scope", "not_applicable"]}
+        }
+      }
+    },
+    "owner_signature": {"type": "string", "minLength": 32}
   }
 }

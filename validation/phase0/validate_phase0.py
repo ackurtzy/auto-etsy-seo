@@ -157,6 +157,20 @@ def main() -> int:
     if g0_evidence["sha256"] != actual_a0_hash:
         raise AssertionError("G0 A0 evidence hash does not match the checked-in artifact")
 
+    private_schema = load_json(ROOT / "docs" / "gates" / "private-evidence-schema.json")
+    evidence_schema = private_schema["properties"]["evidence"]["items"]
+    required_private_evidence = {
+        "artifact_id",
+        "sha256",
+        "source_type",
+        "reviewed_at",
+        "result",
+    }
+    if evidence_schema.get("additionalProperties") is not False:
+        raise AssertionError("private gate evidence must reject unknown fields")
+    if set(evidence_schema.get("required", [])) != required_private_evidence:
+        raise AssertionError("private gate evidence schema is missing hashed review fields")
+
     completed = subprocess.run(
         [sys.executable, "-m", "unittest", "discover", "-s", "validation/phase0", "-p", "test_*.py"],
         cwd=ROOT,
