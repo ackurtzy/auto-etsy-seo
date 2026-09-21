@@ -1,0 +1,36 @@
+{
+  "gate_id": "G2",
+  "status": "awaiting_H2_owner_disposition",
+  "scope": "statistical_method_and_shop_feasibility",
+  "repository_commit": "d9f3b7d821fb3aee2cbe69cc44a36068a4c8cde3",
+  "contract_versions": {
+    "experiment_spec": "v1",
+    "method_profile": "balanced-cluster-v1",
+    "simulation_scenario": "v1",
+    "evidence_manifest": "v1",
+    "evaluation_result": "v1"
+  },
+  "automated_evidence": [
+    {
+      "test_id": "A2",
+      "result": "passed_automated_awaiting_H2",
+      "artifact": "validation/phase2/a2-results.json",
+      "sha256": "b85f5f4d6d277748f2884dabb005e6c5cf0fccca22f0a1ab032d66fecf4557ee"
+    }
+  ],
+  "human_evidence": [],
+  "recommended_product_disposition": "directional_only_randomized_disabled",
+  "capability_dispositions": {
+    "directional_reporting_contract": "implemented_not_enabled_pending_G1_H2",
+    "randomized_inference": "disabled_shop_not_eligible",
+    "automatic_average_benefit_decision": "disabled_requires_G5_G6",
+    "etsy_writes": "disabled_requires_G3",
+    "ai_generation": "disabled_requires_G4"
+  },
+  "limitations": [
+    "G2 cannot pass until the owner completes H2 and explicitly accepts a supported route.",
+    "The current shop evidence does not establish independent clusters or acceptable concentration.",
+    "A2 validates only balanced-cluster-v1 within its declared profile.",
+    "No production runtime capability is enabled by this record."
+  ]
+}

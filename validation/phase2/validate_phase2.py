@@ -63,6 +63,14 @@ def main() -> int:
             raise AssertionError(f"{name}: schema must reject unknown top-level fields and require its contract")
         schema_hashes[name] = hashlib.sha256(path.read_bytes()).hexdigest()
 
+    scenario_fixture = json.loads((ROOT / "validation" / "phase2" / "fixtures" / "simulation-scenarios.json").read_text(encoding="utf-8"))
+    for scenario in scenario_fixture["scenarios"]:
+        lengths = {len(scenario[field]) for field in ("listingCounts", "baselineTotals", "controlOutcomes", "treatmentOutcomes")}
+        if len(lengths) != 1 or next(iter(lengths)) < 8:
+            raise AssertionError(f"{scenario['scenarioId']}: scenario arrays must align with at least eight clusters")
+        if scenario["repetitions"] < (2_000 if scenario["evaluatePower"] else 10_000):
+            raise AssertionError(f"{scenario['scenarioId']}: insufficient release repetitions")
+
     run(["npm", "run", "typecheck:phase2"])
     run(["npm", "run", "test:phase2"])
     run(["python3", "validation/phase2/validate_reference.py"])
@@ -76,6 +84,40 @@ def main() -> int:
         raise AssertionError("release simulation suite did not pass")
     if live_release["monte_carlo_benchmark"]["elapsedMilliseconds"] > 10_000:
         raise AssertionError("production Monte Carlo benchmark exceeded the 10-second offline execution budget")
+
+    a2_path = ROOT / "validation" / "phase2" / "a2-results.json"
+    a2 = json.loads(a2_path.read_text(encoding="utf-8"))
+    g2 = json.loads((ROOT / "docs" / "gates" / "G2.json").read_text(encoding="utf-8"))
+    if a2["status"] != "passed_automated_awaiting_H2" or a2["external_requests"] != 0:
+        raise AssertionError("A2 must remain credential-free and awaiting H2")
+    if g2["status"] != "awaiting_H2_owner_disposition" or g2["recommended_product_disposition"] != "directional_only_randomized_disabled":
+        raise AssertionError("G2 must keep randomized functionality disabled before H2")
+    if g2["repository_commit"] != a2["repository_commit"]:
+        raise AssertionError("G2 and A2 do not bind the same implementation revision")
+    actual_a2_hash = hashlib.sha256(a2_path.read_bytes()).hexdigest()
+    if g2["automated_evidence"][0]["sha256"] != actual_a2_hash:
+        raise AssertionError("G2 A2 evidence hash mismatch")
+    ancestor = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", a2["repository_commit"], "HEAD"],
+        cwd=ROOT,
+        check=False,
+    )
+    if ancestor.returncode != 0:
+        raise AssertionError("A2 implementation revision is not an ancestor of HEAD")
+    changed = set(run(["git", "diff", "--name-only", f"{a2['repository_commit']}..HEAD"]).splitlines())
+    evidence_only = {
+        "docs/gates/G0.json",
+        "docs/gates/G1.json",
+        "docs/gates/G2.json",
+        "validation/phase0/a0-results.json",
+        "validation/phase1/a1-results.json",
+        "validation/phase2/a2-results.json",
+    }
+    unexpected = changed.difference(evidence_only)
+    if unexpected:
+        raise AssertionError("A2 evidence is stale for implementation changes: " + ", ".join(sorted(unexpected)))
+    if run(["git", "status", "--porcelain", "--untracked-files=all"]).strip():
+        raise AssertionError("A2 evidence validation requires a clean reviewed worktree")
 
     print(json.dumps({
         "gate": "A2",

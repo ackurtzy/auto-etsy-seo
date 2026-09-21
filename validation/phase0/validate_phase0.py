@@ -207,8 +207,10 @@ def main() -> int:
     evidence_only_paths = {
         "docs/gates/G0.json",
         "docs/gates/G1.json",
+        "docs/gates/G2.json",
         "validation/phase0/a0-results.json",
         "validation/phase1/a1-results.json",
+        "validation/phase2/a2-results.json",
     }
     unexpected_changes = set(changed_since_evidence).difference(evidence_only_paths)
     if unexpected_changes:
