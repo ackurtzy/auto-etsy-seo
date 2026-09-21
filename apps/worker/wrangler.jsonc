@@ -14,6 +14,7 @@
   "vars": {
     "ENVIRONMENT": "local",
     "ETSY_BASE_URL": "https://openapi.etsy.com/v3",
+    "ETSY_READ_EGRESS_ENABLED": "false",
     "ETSY_EGRESS_ENABLED": "false",
     "TITLE_WRITES_ENABLED": "false",
     "EXECUTOR_VERSION": "title-v1",

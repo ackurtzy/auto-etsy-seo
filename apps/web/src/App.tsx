@@ -1,110 +1,106 @@
-import { useMemo, useState, type FormEvent } from "react";
-import { useAuth, UserButton } from "@clerk/react";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { ApiError, Phase3Api, type CommandInput, type OperationReceipt, type Scope } from "./api.ts";
+import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ApiError, Phase3Api, type CommandInput, type GateId, type GateWorkspace, type OperationReceipt, type ReviewOutcome, type Scope, type SessionResponse } from "./api.ts";
+import { demoGates, demoSession } from "./demo-data.ts";
+
+type Route = "overview" | "catalog" | "proposals" | "studies" | "results" | "recovery" | "gate-review" | "setup";
+const routePaths: Record<Route, string> = { overview: "/overview", catalog: "/catalog", proposals: "/proposals", studies: "/studies", results: "/results", recovery: "/recovery", "gate-review": "/setup/gates", setup: "/setup" };
+
+export function App({ getToken, accountControl, demoMode = false }: { getToken: () => Promise<string | null>; accountControl?: ReactNode; demoMode?: boolean }) {
+  const api = useMemo(() => new Phase3Api(getToken), [getToken]);
+  const [route, navigate] = useRoute();
+  const [demoGateState, setDemoGateState] = useState(() => structuredClone(demoGates));
+  const sessionQuery = useQuery({ queryKey: ["session"], queryFn: () => api.session(), enabled: !demoMode });
+  const session = demoMode ? demoSession : sessionQuery.data;
+  const [scope, setScope] = useState<Scope | null>(null);
+  useEffect(() => { const tenant = session?.tenants[0]; const shop = tenant?.shops[0]; if (!scope && tenant && shop) setScope({ tenantId: tenant.id, shopId: shop.id }); }, [scope, session]);
+  const gatesQuery = useQuery({ queryKey: ["gates", scope], queryFn: () => api.gates(scope!), enabled: !demoMode && scope !== null });
+  const gates = demoMode ? demoGateState : gatesQuery.data?.gates;
+  const tenant = session?.tenants.find((item) => item.id === scope?.tenantId) ?? session?.tenants[0];
+  const shop = tenant?.shops.find((item) => item.id === scope?.shopId) ?? tenant?.shops[0];
+  let content: ReactNode;
+  if (sessionQuery.isLoading && !demoMode) content = <LoadingPage />;
+  else if (sessionQuery.error) content = <ErrorPage error={sessionQuery.error} />;
+  else if (!tenant || !shop) content = <SetupPage api={api} session={session} />;
+  else if (route === "gate-review") content = <GateReviewPage gates={gates} scope={scope!} api={api} demoMode={demoMode} setDemoGateState={setDemoGateState} />;
+  else if (route === "overview") content = <OverviewPage gates={gates} navigate={navigate} />;
+  else if (route === "catalog") content = <CatalogPage />;
+  else if (route === "recovery") content = <RecoveryPage api={api} scope={scope!} />;
+  else if (route === "setup") content = <SetupPage api={api} session={session} />;
+  else if (route === "results") content = <ResultsPage />;
+  else content = <LockedPage route={route} gates={gates} navigate={navigate} />;
+  return <div className="app-shell"><Sidebar route={route} navigate={navigate} /><div className="app-frame"><Topbar tenant={tenant?.name ?? "Auto Etsy SEO"} role={tenant?.role ?? "review mode"} accountControl={accountControl} /><main className="page-canvas">{content}</main></div></div>;
+}
+
+function useRoute(): [Route, (route: Route) => void] {
+  const fromPath = (): Route => (Object.entries(routePaths).find(([, path]) => window.location.pathname === path)?.[0] as Route | undefined) ?? "gate-review";
+  const [route, setRoute] = useState<Route>(fromPath);
+  useEffect(() => { const listener = () => setRoute(fromPath()); window.addEventListener("popstate", listener); return () => window.removeEventListener("popstate", listener); }, []);
+  return [route, (next) => { window.history.pushState({}, "", routePaths[next]); setRoute(next); }];
+}
+
+function Sidebar({ route, navigate }: { route: Route; navigate: (route: Route) => void }) {
+  const primary: Array<[Route, string, IconName, boolean?]> = [["overview", "Overview", "home"], ["catalog", "Catalog", "tag"], ["proposals", "Proposals", "document", true], ["studies", "Studies", "bars", true], ["results", "Results", "trend"], ["recovery", "Recovery", "refresh"]];
+  return <aside className="sidebar"><button className="brand" onClick={() => navigate("overview")}><LeafMark /><span>Auto<br />Etsy SEO</span></button><nav aria-label="Main navigation">{primary.map(([key, label, icon, locked]) => <NavItem key={key} active={route === key} label={label} icon={icon} locked={locked} onClick={() => navigate(key)} />)}<div className="nav-divider" /><NavItem active={route === "setup"} label="Setup" icon="settings" onClick={() => navigate("setup")} /><NavItem active={route === "gate-review"} label="Gate review" icon="check" nested onClick={() => navigate("gate-review")} /></nav><div className="sidebar-art" aria-hidden="true"><span>✦</span><i /><b>Small ideas.<br />Brighter tomorrows.</b></div></aside>;
+}
+
+function NavItem({ active, label, icon, locked, nested, onClick }: { active: boolean; label: string; icon: IconName; locked?: boolean; nested?: boolean; onClick: () => void }) { return <button className={`nav-item ${active ? "active" : ""} ${nested ? "nested" : ""}`} onClick={onClick} aria-current={active ? "page" : undefined}><Icon name={icon} /><span>{label}</span>{locked && <Icon name="lock" />}</button>; }
+function Topbar({ tenant, role, accountControl }: { tenant: string; role: string; accountControl?: ReactNode }) { return <header className="app-topbar"><span className="studio-note">A calmer, smarter Etsy</span><div className="account-cluster"><span className="avatar">{tenant.slice(0, 1).toUpperCase()}</span><span><strong>{tenant}</strong><small>{role}</small></span>{accountControl}</div></header>; }
+
+function GateReviewPage({ gates, scope, api, demoMode, setDemoGateState }: { gates?: GateWorkspace[]; scope: Scope; api: Phase3Api; demoMode: boolean; setDemoGateState: React.Dispatch<React.SetStateAction<GateWorkspace[]>> }) {
+  const queryClient = useQueryClient(); const [gateId, setGateId] = useState<GateId>("G1"); const gate = gates?.find((item) => item.gate.id === gateId); const [selectedIndex, setSelectedIndex] = useState(0); const [note, setNote] = useState("");
+  const mutation = useMutation({ mutationFn: async ({ outcome }: { outcome: ReviewOutcome }) => { if (!gate?.run || !gate.items[selectedIndex]) throw new Error("gate_item_unavailable"); if (demoMode) return null; return api.respondToGateItem(scope, gate.run.id, gate.items[selectedIndex].id, { outcome, note, evidenceRevision: gate.run.evidenceRevision }); }, onSuccess: (workspace, variables) => { if (demoMode && gate) setDemoGateState((current) => current.map((candidate) => candidate.gate.id === gate.gate.id ? updateDemoGate(candidate, selectedIndex, variables.outcome, note) : candidate)); else if (workspace) queryClient.setQueryData(["gates", scope], (old: { gates: GateWorkspace[] } | undefined) => ({ gates: (old?.gates ?? []).map((item) => item.gate.id === workspace.gate.id ? workspace : item) })); setNote(""); if (selectedIndex < (gate?.items.length ?? 1) - 1) setSelectedIndex((value) => value + 1); } });
+  const approve = useMutation({ mutationFn: () => gate?.run ? api.approveGate(scope, gate.run.id, gateId === "G2" ? "directional_only" : gateId === "G3" ? "title_canary_only" : "owner_approved") : Promise.reject(new Error("gate_run_unavailable")), onSuccess: (workspace) => queryClient.setQueryData(["gates", scope], (old: { gates: GateWorkspace[] } | undefined) => ({ gates: (old?.gates ?? []).map((item) => item.gate.id === workspace.gate.id ? workspace : item) })) });
+  const collect = useMutation({ mutationFn: () => api.collectGate1(scope), onSuccess: (workspace) => { queryClient.setQueryData(["gates", scope], (old: { gates: GateWorkspace[] } | undefined) => ({ gates: (old?.gates ?? []).map((item) => item.gate.id === "G1" ? workspace : item) })); setSelectedIndex(0); } });
+  const upload = useMutation({ mutationFn: (file: File) => { if (!gate?.run || !gate.items[selectedIndex]) throw new Error("gate_item_unavailable"); return api.uploadGateArtifact(scope, gate.run.id, gate.items[selectedIndex].id, file); } });
+  const prepareProtocol = useMutation({ mutationFn: (id: "G2" | "G3") => api.prepareGate(scope, id), onSuccess: (workspace) => queryClient.setQueryData(["gates", scope], (old: { gates: GateWorkspace[] } | undefined) => ({ gates: (old?.gates ?? []).map((item) => item.gate.id === workspace.gate.id ? workspace : item) })) });
+  const protocolResponse = useMutation({ mutationFn: ({ itemId, outcome }: { itemId: string; outcome: ReviewOutcome }) => { if (!gate?.run) throw new Error("gate_run_unavailable"); return api.respondToGateItem(scope, gate.run.id, itemId, { outcome, note: "", evidenceRevision: gate.run.evidenceRevision }); }, onSuccess: (workspace) => queryClient.setQueryData(["gates", scope], (old: { gates: GateWorkspace[] } | undefined) => ({ gates: (old?.gates ?? []).map((item) => item.gate.id === workspace.gate.id ? workspace : item) })) });
+  if (!gates || !gate) return <LoadingPage />;
+  const actionError = mutation.error ?? approve.error ?? collect.error ?? prepareProtocol.error ?? protocolResponse.error;
+  return <div className="gate-page"><div className="decor-leaves" aria-hidden="true">❧</div><div className="paper-note" aria-hidden="true">Good listings<br />brighter days ♡</div><div className="page-heading"><h1>{gate.gate.title}</h1><p>{gate.gate.description}</p></div><GateStepper gates={gates} selected={gateId} onSelect={(id) => { setGateId(id); setSelectedIndex(0); }} />{actionError && <ErrorPage error={actionError} />}{gateId === "G1" ? <G1Workspace gate={gate} selectedIndex={selectedIndex} setSelectedIndex={setSelectedIndex} note={note} setNote={setNote} save={(outcome) => mutation.mutate({ outcome })} saving={mutation.isPending} approve={() => approve.mutate()} collect={() => collect.mutate()} collecting={collect.isPending} upload={(file) => upload.mutate(file)} uploading={upload.isPending} uploadError={upload.error ?? null} /> : gateId === "G2" ? <G2Workspace gate={gate} prepare={() => prepareProtocol.mutate("G2")} respond={(itemId, outcome) => protocolResponse.mutate({ itemId, outcome })} approve={() => approve.mutate()} busy={prepareProtocol.isPending || protocolResponse.isPending || approve.isPending} /> : <G3Workspace gate={gate} prepare={() => prepareProtocol.mutate("G3")} respond={(itemId, outcome) => protocolResponse.mutate({ itemId, outcome })} approve={() => approve.mutate()} busy={prepareProtocol.isPending || protocolResponse.isPending || approve.isPending} />}</div>;
+}
+
+function GateStepper({ gates, selected, onSelect }: { gates: GateWorkspace[]; selected: GateId; onSelect: (id: GateId) => void }) { return <div className="gate-stepper" aria-label="Gate progress">{gates.map((gate, index) => <button key={gate.gate.id} className={`${selected === gate.gate.id ? "selected" : ""} ${gate.review.status === "approved" ? "complete" : ""}`} onClick={() => onSelect(gate.gate.id)}><span>{index + 1}</span><strong>{gate.gate.shortTitle}</strong><small>{gate.review.status === "blocked" ? "Locked" : gate.review.status === "approved" ? "Approved" : index === 0 ? "Review collected information" : index === 1 ? "Understand the evidence" : "Confirm safe behavior"}</small></button>)}</div>; }
+
+function G1Workspace({ gate, selectedIndex, setSelectedIndex, note, setNote, save, saving, approve, collect, collecting, upload, uploading, uploadError }: { gate: GateWorkspace; selectedIndex: number; setSelectedIndex: React.Dispatch<React.SetStateAction<number>>; note: string; setNote: (value: string) => void; save: (outcome: ReviewOutcome) => void; saving: boolean; approve: () => void; collect: () => void; collecting: boolean; upload: (file: File) => void; uploading: boolean; uploadError: Error | null }) {
+  if (!gate.run || gate.items.length === 0) return <section className="empty-gate"><Icon name="leaf" /><h2>No G1 evidence packet yet</h2><p>Connect the approved shop and collect a sanitized read-only packet before beginning comparisons.</p><button className="primary plum" onClick={collect} disabled={collecting}>{collecting ? "Collecting…" : "Collect read-only evidence"}</button><small>Collection is owner-only, capped at 12 Etsy requests per UTC day, and never stores buyer details.</small></section>;
+  const item = gate.items[Math.min(selectedIndex, gate.items.length - 1)]!; const comparison = item.comparison; const fields: Array<[string, unknown]> = item.category === "receipt" ? [["Receipt ID", comparison.receiptId], ["Date range", comparison.dateRange], ["Order time (UTC)", comparison.createdAtUtc], ["Transactions", comparison.transactions], ["Units", comparison.units], ["Paid", comparison.wasPaid], ["Canceled", comparison.wasCanceled], ["Refund records", comparison.refundRecords]] : [["Title", comparison.title], ["Status", comparison.status], ["Lifetime views", comparison.views], ["Created (UTC)", comparison.createdAtUtc], ["Updated (UTC)", comparison.updatedAtUtc], ["Tags", Array.isArray(comparison.tags) ? comparison.tags.join(", ") : comparison.tags]];
+  return <div className="gate-workspace"><section className="review-sheet"><div className="review-heading"><div><h2>Gate 1 review</h2><p>{item.instructions}</p></div><div className="review-pager"><button onClick={() => setSelectedIndex((value) => Math.max(0, value - 1))} aria-label="Previous item"><Icon name="arrow-left" /></button><strong>{selectedIndex + 1} <small>of {gate.items.length}</small></strong><button onClick={() => setSelectedIndex((value) => Math.min(gate.items.length - 1, value + 1))} aria-label="Next item"><Icon name="arrow-right" /></button></div></div><div className="comparison-layout"><aside className="listing-summary"><img src="/assets/botanical-journal.png" alt="Botanical stationery journal" /><h3>{item.label}</h3><p>{String(comparison.title ?? (item.category === "receipt" ? "Sanitized order sample" : ""))}</p><dl><dt>{item.category === "receipt" ? "Receipt ID" : "Listing ID"}</dt><dd>{String(comparison.receiptId ?? comparison.listingId ?? "Not recorded")}</dd></dl><a href={item.sourceReference ?? "https://www.etsy.com/your/shops/me/tools/listings"} target="_blank" rel="noreferrer">Open the matching Etsy screen <Icon name="external" /></a><div className="read-only-note"><Icon name="leaf" />No Etsy changes can be made from this screen.</div></aside><div className="comparison-main"><div className="comparison-table" role="table" aria-label="Etsy data comparison"><div className="table-row table-head" role="row"><strong>Field</strong><strong>Collected by the app</strong><strong>Check in Etsy</strong></div>{fields.map(([label, value]) => <div className="table-row" role="row" key={label}><strong>{label}</strong><span>{String(value ?? "Unknown")}</span><span>{label === "Date range" ? String(value ?? "Unknown") : label === "Title" ? "Confirm the exact title" : `Confirm ${label.toLowerCase()}`}</span></div>)}</div><p className="question">Does this information match what you see in Etsy?</p><div className="review-choices"><ChoiceButton tone="success" selected={item.response?.outcome === "matched"} icon="check" label="Matches Etsy" onClick={() => save("matched")} /><ChoiceButton tone="attention" selected={item.response?.outcome === "differs"} icon="alert" label="Something is different" onClick={() => save("differs")} /><ChoiceButton tone="neutral" selected={item.response?.outcome === "cannot_verify"} icon="question" label="I can’t verify" onClick={() => save("cannot_verify")} /></div><div className="note-row"><label><span>Optional note</span><textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Add a note (optional)…" maxLength={2000} /></label><label><span>Add evidence (optional)</span><span className="attachment file-control"><Icon name="paperclip" />{uploading ? "Uploading…" : "Attach a private file"}<input type="file" accept="image/png,image/jpeg,application/pdf,application/json" disabled={uploading} onChange={(event) => { const file = event.target.files?.[0]; if (file) upload(file); }} /></span><small>{uploadError ? humanError(uploadError) : "PNG, JPG, PDF, or JSON · private · 10 MB max"}</small></label></div><div className="sheet-actions"><button className="outline" onClick={() => setSelectedIndex((value) => Math.max(0, value - 1))}><Icon name="arrow-left" /> Back</button><button className="primary plum" disabled={saving} onClick={() => save(item.response?.outcome ?? "matched")}>{saving ? "Saving…" : "Save & next"}<Icon name="arrow-right" /></button></div></div></div></section><aside className="progress-rail"><h3>Progress</h3><Progress value={gate.review.completed} max={gate.review.total} /><p><strong>{gate.review.completed} of {gate.review.total}</strong> checks reviewed <span>{Math.round(gate.review.completed / Math.max(1, gate.review.total) * 100)}%</span></p><div className="rail-section"><h3><Icon name="lock" /> Gate 1 approval</h3><button className="approve" disabled={!gate.review.canApprove} onClick={approve}>Approve Gate 1</button><p>{gate.review.canApprove ? "This approval will bind the current evidence revision." : blockerCopy(gate.review.blockers)}</p></div><div className="rail-section"><h3>What happens next?</h3><ol><li>We’ll surface and resolve differences</li><li>You’ll review how results can be interpreted</li><li>We’ll run final safety checks before any canary</li></ol></div></aside></div>;
+}
+
+function G2Workspace({ gate, prepare, respond, approve, busy }: { gate: GateWorkspace; prepare: () => void; respond: (itemId: string, outcome: ReviewOutcome) => void; approve: () => void; busy: boolean }) {
+  const fallback = [["Six clusters", "Launch rejected", "The smallest exact p-value cannot meet the declared threshold."], ["Eight clusters", "Resolution-feasible only", "Enough assignments exist, but that does not establish useful power."], ["Unequal clusters", "Weight listings correctly", "Listing-days are not interchangeable visitor samples."], ["Before and after", "Directional change", "No causal confidence or winner probability is shown."], ["Heterogeneous effects", "Two different questions", "The sharp-null result and average-effect interval may disagree."], ["This shop", "Directional-only", "Current evidence does not establish an eligible randomized design."]];
+  const scenarios = gate.items.length > 0 ? gate.items.map((item) => ({ id: item.id, title: item.label, body: item.instructions, response: item.response })) : fallback.map(([title, verdict, body], index) => ({ id: `preview-${index}`, title, body: `${body} ${verdict}.`, response: null }));
+  return <section className="guide-sheet"><div className="guide-intro"><span className="guide-number">2</span><div><h2>Know what the numbers can say</h2><p>Review the deterministic examples before choosing a supported product route.</p></div></div>{gate.review.status === "blocked" && <LockedBanner text="Approve Gate 1 before recording the G2 disposition. You can still read every example now." />}{gate.review.status === "not_started" && <div className="protocol-start"><p>The server will bind this review to the approved A2 artifact and directional-only protocol.</p><button className="primary plum" onClick={prepare} disabled={busy}>Start Gate 2 review</button></div>}<div className="scenario-list">{scenarios.map((scenario, index) => <article key={scenario.id}><span>{String(index + 1).padStart(2, "0")}</span><div><h3>{scenario.title}</h3><p>{scenario.body}</p></div>{gate.run ? <button className={scenario.response?.outcome === "matched" ? "mini-approved" : "outline"} disabled={busy} onClick={() => respond(scenario.id, "matched")}>{scenario.response?.outcome === "matched" ? "Understood ✓" : "I understand"}</button> : <strong>Preview</strong>}</article>)}</div><div className="route-decision"><div><h3>Recommended route</h3><strong>Directional studies only</strong><p>Randomized inference and automatic winner decisions remain disabled.</p></div><button className="primary plum" disabled={!gate.review.canApprove || busy} onClick={approve}>Approve Gate 2</button></div></section>;
+}
+
+function G3Workspace({ gate, prepare, respond, approve, busy }: { gate: GateWorkspace; prepare: () => void; respond: (itemId: string, outcome: ReviewOutcome) => void; approve: () => void; busy: boolean }) {
+  const faults = gate.items.filter((item) => item.category === "fault"); const humanSteps = gate.items.filter((item) => item.category === "human_step");
+  const h3Preview = ["Confirm the exact low-risk listing and truthful temporary title", "Submit the same command twice and verify one mutation", "Verify the exact title directly in Etsy", "Preserve an unrelated description edit during revert", "Protect a newer owner title from a conflicting revert", "Reconcile a lost response without a second write", "Verify before- and after-dispatch revocation behavior", "Receive the incident notification and recovery link", "Restore into isolated staging with Etsy egress disabled"];
+  return <section className="guide-sheet"><div className="guide-intro"><span className="guide-number safety">3</span><div><h2>Prove the system fails safely</h2><p>G3a runs against the deployed simulator. H3 then guides one exact, separately authorized title canary.</p></div></div>{gate.review.status === "blocked" && <LockedBanner text="G1 and G2 must pass before G3a can run. Nothing here enables Etsy writes." />}{gate.review.status === "not_started" && <div className="protocol-start"><p>Preparing the checklist does not run a canary or enable Etsy writes.</p><button className="primary plum" onClick={prepare} disabled={busy}>Prepare Gate 3 checklist</button></div>}<div className="safety-columns"><div><div className="section-title"><div><h3>G3a · deployed safety suite</h3><p>F01–F15 must pass through the real deployed boundaries. Local results do not count.</p></div><button className="outline" disabled>Awaiting staging deployment</button></div><div className="fault-grid">{(faults.length > 0 ? faults : Array.from({ length: 15 }, (_, index) => ({ id: `preview-${index}`, label: `F${String(index + 1).padStart(2, "0")}`, response: null }))).map((item) => <div key={item.id}><strong>{item.label}</strong><span>{item.response?.outcome === "matched" ? "Recorded" : "Not run"}</span></div>)}</div></div><div><div className="section-title"><div><h3>H3 · exact-title canary</h3><p>Record a step only after observing it in the separately authorized live canary.</p></div></div><ol className="canary-steps">{(humanSteps.length > 0 ? humanSteps : h3Preview.map((instructions, index) => ({ id: `preview-h3-${index}`, instructions, response: null }))).map((step, index) => <li key={step.id}><span>{index + 1}</span><p>{step.instructions}</p>{gate.run ? <button className={step.response?.outcome === "matched" ? "mini-approved" : "outline"} disabled={busy} onClick={() => respond(step.id, "matched")}>{step.response?.outcome === "matched" ? "Observed ✓" : "Record observed"}</button> : <em>Locked</em>}</li>)}</ol></div></div><div className="capability-boundary"><Icon name="shield" /><div><strong>Passing G3 enables owner-operated titles only.</strong><p>Tags, general Etsy egress, AI execution, and automation stay disabled.</p></div><button className="primary plum" disabled={!gate.review.canApprove || busy} onClick={approve}>Approve Gate 3</button></div></section>;
+}
+
+function OverviewPage({ gates, navigate }: { gates?: GateWorkspace[]; navigate: (route: Route) => void }) { return <div className="simple-page"><div className="page-heading"><h1>Your careful path to better listings</h1><p>Build trust in the data, its interpretation, and every change before running a study.</p></div><div className="overview-path">{gates?.map((gate, index) => <button key={gate.gate.id} onClick={() => navigate("gate-review")}><span>{index + 1}</span><div><h2>{gate.gate.title}</h2><p>{gate.gate.description}</p></div><strong>{gate.review.status.replaceAll("_", " ")}</strong></button>)}</div></div>; }
+function CatalogPage() { return <div className="simple-page"><div className="page-heading"><h1>Your listing catalog</h1><p>Read-only listing information and its measurement readiness live here.</p></div><div className="catalog-grid">{demoGates[0]!.items.slice(0, 6).map((item) => <article key={item.id}><img src="/assets/botanical-journal.png" alt="" /><div><h2>{item.label}</h2><p>{String(item.comparison.title)}</p><span>Evidence needs Gate 1 review</span></div></article>)}</div></div>; }
+function ResultsPage() { return <div className="simple-page"><div className="page-heading"><h1>Results without spin</h1><p>Deterministic evaluations will appear here after a permitted study matures.</p></div><EmptyGate title="No completed studies" body="The app will never label a directional change as a winner." /></div>; }
+function LockedPage({ route, gates, navigate }: { route: Route; gates?: GateWorkspace[]; navigate: (route: Route) => void }) { const label = route === "proposals" ? "Proposals" : "Studies"; return <div className="simple-page"><div className="page-heading"><h1>{label}</h1><p>This product area is visible now so its prerequisites are never mysterious.</p></div><section className="locked-page"><Icon name="lock" /><h2>{label} are intentionally locked</h2><p>Complete G1 data review, accept the G2 route, and pass G3 safety validation first.</p><ul>{gates?.map((gate) => <li key={gate.gate.id}><span>{gate.gate.id}</span>{gate.gate.title}<strong>{gate.review.status.replaceAll("_", " ")}</strong></li>)}</ul><button className="primary plum" onClick={() => navigate("gate-review")}>Open gate review</button></section></div>; }
+
+function SetupPage({ api, session }: { api: Phase3Api; session?: SessionResponse }) { const [tenantId, setTenantId] = useState(session?.tenants[0]?.id ?? ""); const [shopId, setShopId] = useState(""); const [error, setError] = useState<string | null>(null); async function connect(event: FormEvent) { event.preventDefault(); try { window.location.assign(await api.startEtsyOAuth(tenantId, shopId, "read_only")); } catch (caught) { setError(humanError(caught as Error)); } } return <div className="simple-page"><div className="page-heading"><h1>Connect your shop carefully</h1><p>Start with fresh read-only OAuth. Title-write access is requested later only for an approved canary.</p></div><form className="setup-form" onSubmit={connect}><label><span>Workspace</span><select value={tenantId} onChange={(event) => setTenantId(event.target.value)}>{session?.tenants.map((tenant) => <option key={tenant.id} value={tenant.id}>{tenant.name}</option>)}</select></label><label><span>Etsy shop ID</span><input inputMode="numeric" pattern="[0-9]+" value={shopId} onChange={(event) => setShopId(event.target.value)} required /></label><div className="scope-list"><strong>This connection requests:</strong><span>Read listings</span><span>Read transactions</span><span>Read shop identity</span><em>It does not request listing-write access.</em></div>{error && <p className="error" role="alert">{error}</p>}<button className="primary plum">Continue to Etsy</button></form></div>; }
 
 const activeStates = new Set(["queued", "validating", "prepared", "dispatching", "verifying", "unknown"]);
+function RecoveryPage({ api, scope }: { api: Phase3Api; scope: Scope }) { const [form, setForm] = useState<CommandInput>({ idempotencyKey: crypto.randomUUID(), listingId: "", baselineTitle: "", proposedTitle: "", approvalExpiresAt: new Date(Date.now() + 86_400_000).toISOString(), authority: { tenantEpoch: 1, shopEpoch: 1, capabilityEpoch: 1 } }); const [operationId, setOperationId] = useState<string | null>(null); const operation = useQuery({ queryKey: ["operation", scope, operationId], queryFn: () => api.operation(scope, operationId!), enabled: operationId !== null, refetchInterval: (query) => activeStates.has(query.state.data?.state ?? "") ? 5_000 : false }); const submit = useMutation({ mutationFn: () => api.createTitleCommand(scope, form), onSuccess: (receipt) => setOperationId(receipt.id) }); return <div className="simple-page"><div className="page-heading"><h1>Recovery and exact operations</h1><p>Every title command remains bound to one listing, baseline, proposed value, authority revision, and expiry.</p></div><form className="recovery-form" onSubmit={(event) => { event.preventDefault(); submit.mutate(); }}><label><span>Listing ID</span><input value={form.listingId} onChange={(event) => setForm({ ...form, listingId: event.target.value })} required /></label><div className="title-pair"><label><span>Current approved baseline</span><textarea value={form.baselineTitle} onChange={(event) => setForm({ ...form, baselineTitle: event.target.value })} required /></label><label><span>Exact proposed title</span><textarea value={form.proposedTitle} onChange={(event) => setForm({ ...form, proposedTitle: event.target.value })} required /></label></div><LockedBanner text="This form cannot dispatch unless the server-side gate, exact canary permit, scopes, epochs, quotas, and kill switches all permit it." /><button className="primary plum" disabled={submit.isPending}>Review exact title command</button></form>{submit.error && <ErrorPage error={submit.error} />}{operation.data && <OperationCard operation={operation.data} />}</div>; }
+function OperationCard({ operation }: { operation: OperationReceipt }) { return <section className="operation-card"><div><span>Immutable operation receipt</span><h2>{operation.state.replaceAll("_", " ")}</h2></div><code>{operation.id}</code><dl><div><dt>Listing</dt><dd>{operation.listingId}</dd></div><div><dt>Attempt</dt><dd>{operation.dispatchedAt ? "Recorded before network I/O" : "Not dispatched"}</dd></div><div><dt>Verification</dt><dd>{operation.verificationKind ?? "Not verified"}</dd></div></dl></section>; }
 
-function tomorrow(): string { return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); }
+function updateDemoGate(gate: GateWorkspace, index: number, outcome: ReviewOutcome, note: string): GateWorkspace { const items = gate.items.map((item, itemIndex) => itemIndex === index ? { ...item, response: { id: crypto.randomUUID(), outcome, note, evidence_revision: gate.run!.evidenceRevision, created_at: new Date().toISOString() } } : item); const completed = items.filter((item) => item.response && ["matched", "resolved_difference", "unavailable_disabled"].includes(item.response.outcome)).length; const attention = items.some((item) => item.response && ["differs", "cannot_verify"].includes(item.response.outcome)); return { ...gate, items, review: { ...gate.review, completed, canApprove: completed === gate.review.total && !attention, status: attention ? "needs_attention" : "ready_for_review", blockers: completed === gate.review.total && !attention ? [] : [attention ? "unresolved_difference" : "required_comparisons_incomplete"] } }; }
+function ChoiceButton({ selected, tone, icon, label, onClick }: { selected: boolean; tone: string; icon: IconName; label: string; onClick: () => void }) { return <button className={`choice ${tone} ${selected ? "selected" : ""}`} onClick={onClick}><span><Icon name={icon} /></span>{label}</button>; }
+function Progress({ value, max }: { value: number; max: number }) { return <div className="progress-track" aria-label={`${value} of ${max}`}><span style={{ width: `${Math.min(100, value / Math.max(1, max) * 100)}%` }} /></div>; }
+function LockedBanner({ text }: { text: string }) { return <div className="locked-banner"><Icon name="lock" />{text}</div>; }
+function EmptyGate({ title, body }: { title: string; body: string }) { return <section className="empty-gate"><Icon name="leaf" /><h2>{title}</h2><p>{body}</p></section>; }
+function LoadingPage() { return <div className="loading" aria-live="polite"><span /><p>Preparing the workspace…</p></div>; }
+function ErrorPage({ error }: { error: Error }) { return <div className="error" role="alert">{humanError(error)}</div>; }
+function blockerCopy(blockers: string[]): string { if (blockers.includes("required_comparisons_incomplete")) return "Complete or explicitly resolve every required comparison."; if (blockers.includes("unresolved_difference")) return "Resolve differences or disable the affected metric."; if (blockers.includes("evidence_revision_changed")) return "The evidence changed; review the current revision."; return "This gate is not ready for approval."; }
+function humanError(error: Error): string { return error instanceof ApiError ? `The request was not accepted: ${error.code.replaceAll("_", " ")}.` : "The request failed without changing Etsy."; }
 
-export function App() {
-  const { getToken } = useAuth();
-  const api = useMemo(() => new Phase3Api(getToken), [getToken]);
-  const [scope, setScope] = useState<Scope>({ tenantId: "", shopId: "" });
-  const [form, setForm] = useState<CommandInput>({
-    idempotencyKey: crypto.randomUUID(), listingId: "", baselineTitle: "", proposedTitle: "",
-    approvalExpiresAt: tomorrow(), authority: { tenantEpoch: 1, shopEpoch: 1, capabilityEpoch: 1 },
-  });
-  const [operationId, setOperationId] = useState<string | null>(null);
-  const operation = useQuery({
-    queryKey: ["operation", scope, operationId],
-    queryFn: () => api.operation(scope, operationId!),
-    enabled: operationId !== null && scope.tenantId.length > 0 && scope.shopId.length > 0,
-    refetchInterval: (query) => activeStates.has(query.state.data?.state ?? "") ? 5_000 : false,
-  });
-  const submit = useMutation({
-    mutationFn: () => api.createTitleCommand(scope, form),
-    onSuccess: (receipt) => setOperationId(receipt.id),
-  });
-  const keep = useMutation({ mutationFn: (receipt: OperationReceipt) => api.keep(scope, receipt.id), onSuccess: (receipt) => setOperationId(receipt.id) });
-  const revert = useMutation({ mutationFn: (receipt: OperationReceipt) => api.revert(scope, receipt, form.authority), onSuccess: (receipt) => setOperationId(receipt.id) });
-
-  function onSubmit(event: FormEvent) {
-    event.preventDefault();
-    submit.mutate();
-  }
-
-  const displayed = operation.data;
-  const error = submit.error ?? operation.error ?? keep.error ?? revert.error;
-  return <main>
-    <header className="topbar">
-      <div><span className="eyebrow">Phase 3 · human-approved title operation</span><h1>Review the exact Etsy change</h1></div>
-      <UserButton />
-    </header>
-    <p className="lede">This executor changes only the title. It reads Etsy immediately before dispatch, writes once, and blocks further work if the result is uncertain.</p>
-
-    <section className="panel" aria-labelledby="scope-heading">
-      <h2 id="scope-heading">Authorized scope</h2>
-      <div className="grid two">
-        <Field label="Tenant ID" value={scope.tenantId} onChange={(tenantId) => setScope({ ...scope, tenantId })} />
-        <Field label="Shop connection ID" value={scope.shopId} onChange={(shopId) => setScope({ ...scope, shopId })} />
-      </div>
-    </section>
-
-    <form className="panel" onSubmit={onSubmit}>
-      <h2>Exact title diff</h2>
-      <Field label="Etsy listing ID" value={form.listingId} onChange={(listingId) => setForm({ ...form, listingId })} inputMode="numeric" />
-      <div className="diff-grid">
-        <TitleField label="Current approved baseline" tone="before" value={form.baselineTitle} onChange={(baselineTitle) => setForm({ ...form, baselineTitle })} />
-        <TitleField label="Exact proposed title" tone="after" value={form.proposedTitle} onChange={(proposedTitle) => setForm({ ...form, proposedTitle })} />
-      </div>
-      <fieldset>
-        <legend>Authority revisions</legend>
-        <div className="grid three">
-          {(["tenantEpoch", "shopEpoch", "capabilityEpoch"] as const).map((key) => <Field key={key} label={labelFor(key)} type="number" value={String(form.authority[key])} onChange={(value) => setForm({ ...form, authority: { ...form.authority, [key]: Number(value) } })} />)}
-        </div>
-      </fieldset>
-      <div className="warning"><strong>Dispatch rule:</strong> approval is bound to these exact values and expires within 24 hours. A baseline conflict, revocation, kill switch, or gate mismatch prevents the PATCH.</div>
-      <button className="primary" disabled={submit.isPending || !scope.tenantId || !scope.shopId || !form.listingId || !form.baselineTitle || !form.proposedTitle}>
-        {submit.isPending ? "Accepting command…" : "Approve exact title command"}
-      </button>
-    </form>
-
-    {error && <div className="error" role="alert">{humanError(error)}</div>}
-    {displayed && <Receipt operation={displayed} onKeep={() => keep.mutate(displayed)} onRevert={() => revert.mutate(displayed)} busy={keep.isPending || revert.isPending} />}
-  </main>;
-}
-
-function Receipt({ operation, onKeep, onRevert, busy }: { operation: OperationReceipt; onKeep: () => void; onRevert: () => void; busy: boolean }) {
-  const recovery = operation.state === "unknown" || operation.state === "manual_required" || operation.state === "conflict";
-  return <section className={`panel receipt state-${operation.state}`} aria-live="polite">
-    <div className="receipt-head"><div><span className="eyebrow">Immutable operation receipt</span><h2>{operation.state.replaceAll("_", " ")}</h2></div><code>{operation.id}</code></div>
-    <dl>
-      <div><dt>Listing</dt><dd>{operation.listingId}</dd></div>
-      <div><dt>Mutation attempt</dt><dd>{operation.dispatchedAt ? "Recorded before network I/O" : "Not dispatched"}</dd></div>
-      <div><dt>Verification</dt><dd>{operation.verificationKind ?? "Not verified"}</dd></div>
-      <div><dt>Reconciliation reads</dt><dd>{operation.reconciliationReads}</dd></div>
-    </dl>
-    <div className="diff-grid compact"><DiffValue label="Before" value={operation.baselineTitle} /><DiffValue label="Desired" value={operation.proposedTitle} /></div>
-    {recovery && <div className="recovery" role="status"><strong>No blind retry is available.</strong><p>{recoveryCopy(operation)}</p>{operation.failureCode && <code>{operation.failureCode}</code>}</div>}
-    {operation.state === "verified" && operation.kind === "apply" && <div className="actions">
-      <button className="secondary" disabled={busy} onClick={onKeep}>Verify and keep</button>
-      <button className="danger" disabled={busy} onClick={onRevert}>Authorize conditional title revert</button>
-    </div>}
-  </section>;
-}
-
-function Field({ label, value, onChange, type="text", inputMode }: { label: string; value: string; onChange: (value: string) => void; type?: string; inputMode?: "numeric" }) {
-  return <label><span>{label}</span><input type={type} inputMode={inputMode} value={value} onChange={(event) => onChange(event.target.value)} required /></label>;
-}
-function TitleField({ label, value, onChange, tone }: { label: string; value: string; onChange: (value: string) => void; tone: string }) {
-  return <label className={`title-field ${tone}`}><span>{label}</span><textarea value={value} maxLength={140} onChange={(event) => onChange(event.target.value)} required /><small>{Array.from(value).length} / 140 characters</small></label>;
-}
-function DiffValue({ label, value }: { label: string; value: string }) { return <div className="diff-value"><strong>{label}</strong><p>{value}</p></div>; }
-function labelFor(key: keyof CommandInput["authority"]): string { return key.replace("Epoch", " authority epoch").replace(/^./, (v) => v.toUpperCase()); }
-function humanError(error: Error): string { return error instanceof ApiError ? `The operation was not accepted: ${error.code.replaceAll("_", " ")}.` : "The request failed without changing Etsy."; }
-function recoveryCopy(operation: OperationReceipt): string {
-  if (operation.state === "conflict") return "The current Etsy title differs from the approved baseline or last verified experiment title. The current owner state is preserved.";
-  if (operation.state === "manual_required") return "Bounded reconciliation ended without a safe conclusion. This shop’s write lane remains blocked until an owner resolves it.";
-  return "The request may have reached Etsy. The executor will only read and reconcile; it will not send the mutation again.";
-}
+type IconName = "home" | "tag" | "document" | "bars" | "trend" | "refresh" | "settings" | "check" | "lock" | "arrow-left" | "arrow-right" | "external" | "leaf" | "alert" | "question" | "paperclip" | "shield";
+function Icon({ name }: { name: IconName }) { const paths: Record<IconName, ReactNode> = { home: <><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5M9 21v-7h6v7"/></>, tag: <><path d="M4 4h7l9 9-7 7-9-9V4Z"/><circle cx="8" cy="8" r="1"/></>, document: <><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 12h6M9 16h6"/></>, bars: <><path d="M5 20v-7h3v7M11 20V4h3v16M17 20v-11h3v11"/></>, trend: <><path d="m3 18 6-6 4 4 8-9"/><path d="M16 7h5v5"/></>, refresh: <><path d="M20 7v5h-5"/><path d="M19 12a7 7 0 1 1-2-5"/></>, settings: <><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></>, check: <><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></>, lock: <><rect x="6" y="10" width="12" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></>, "arrow-left": <path d="m15 18-6-6 6-6"/>, "arrow-right": <path d="m9 18 6-6-6-6"/>, external: <><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 13v7H4V6h7"/></>, leaf: <><path d="M5 20c8 0 14-6 14-14-8 0-14 6-14 14Z"/><path d="M5 20c3-5 7-8 12-11"/></>, alert: <><path d="M12 3 2.5 20h19Z"/><path d="M12 9v5M12 17h.01"/></>, question: <><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.7 2.7 0 1 1 4 2.4c-1 .5-1.5 1.1-1.5 2.1M12 17h.01"/></>, paperclip: <path d="m20 11-8.5 8.5a5 5 0 0 1-7-7L14 3a3.5 3.5 0 0 1 5 5l-9.5 9.5a2 2 0 0 1-3-3L15 6"/>, shield: <><path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6Z"/><path d="m8.5 12 2 2 5-5"/></> }; return <svg className="icon" viewBox="0 0 24 24" aria-hidden="true">{paths[name]}</svg>; }
+function LeafMark() { return <svg className="leaf-mark" viewBox="0 0 40 40" aria-hidden="true"><path d="M19 34C8 29 5 18 7 6c9 2 15 8 15 18 1-9 7-14 14-16 1 12-5 21-17 26Z" fill="currentColor"/></svg>; }

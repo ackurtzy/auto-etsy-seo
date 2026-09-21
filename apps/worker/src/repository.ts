@@ -113,6 +113,12 @@ export class OperationRepository {
     if (!row) throw new Error("role_forbidden");
   }
 
+  async findShopConnection(tenantId: string, externalShopId: string): Promise<{ id: string; tokenVersion: number } | null> {
+    const row = await this.db.prepare(`SELECT id,token_version FROM shop_connections WHERE tenant_id=? AND external_shop_id=?`)
+      .bind(tenantId, externalShopId).first<{ id: string; token_version: number | null }>();
+    return row ? { id: row.id, tokenVersion: row.token_version ?? 0 } : null;
+  }
+
   async createShopConnection(input: {
     id: string;
     tenantId: string;
@@ -139,6 +145,35 @@ export class OperationRepository {
       this.db.prepare(`INSERT INTO audit_events(id,tenant_id,shop_connection_id,actor_id,event_type,redacted_payload_json,created_at) VALUES(?,?,?,?, 'shop_connected_disabled', ?, ?)`)
         .bind(crypto.randomUUID(), input.tenantId, input.id, input.actorId, JSON.stringify({ external_shop_id_digest: canonicalDigest(input.externalShopId), scopes: input.scopes }), input.now),
     ]);
+  }
+
+  async reauthorizeShopConnection(input: {
+    id: string;
+    tenantId: string;
+    actorId: string;
+    externalShopId: string;
+    currentVersion: number;
+    scopes: string[];
+    access: EncryptedCredential;
+    refresh: EncryptedCredential;
+    expiresAt: string;
+    now: string;
+  }): Promise<void> {
+    await this.assertTenantOwner(input.tenantId, input.actorId);
+    const nextVersion = input.currentVersion + 1;
+    const results = await this.db.batch([
+      this.db.prepare(`INSERT INTO credential_versions(shop_connection_id,version,algorithm,access_nonce,access_ciphertext,refresh_nonce,refresh_ciphertext,expires_at,created_at) VALUES(?,?,?,?,?,?,?,?,?)`)
+        .bind(input.id, nextVersion, input.access.algorithm, input.access.nonce, input.access.ciphertext, input.refresh.nonce, input.refresh.ciphertext, input.expiresAt, input.now),
+      this.db.prepare(`UPDATE shop_connections SET status='active',scopes_json=?,token_version=?,authority_epoch=authority_epoch+1,write_lane_state='paused',updated_at=? WHERE id=? AND tenant_id=? AND external_shop_id=? AND token_version=?`)
+        .bind(JSON.stringify(input.scopes), nextVersion, input.now, input.id, input.tenantId, input.externalShopId, input.currentVersion),
+      this.db.prepare(`UPDATE credential_versions SET revoked_at=? WHERE shop_connection_id=? AND version=? AND revoked_at IS NULL`)
+        .bind(input.now, input.id, input.currentVersion),
+      this.db.prepare(`UPDATE capability_grants SET mode='disabled',authority_epoch=authority_epoch+1,gate_hash=NULL,canary_listing_id=NULL,canary_baseline_digest=NULL,canary_proposed_digest=NULL,canary_expires_at=NULL,updated_at=? WHERE tenant_id=? AND shop_connection_id=?`)
+        .bind(input.now, input.tenantId, input.id),
+      this.db.prepare(`INSERT INTO audit_events(id,tenant_id,shop_connection_id,actor_id,event_type,redacted_payload_json,created_at) VALUES(?,?,?,?, 'shop_reauthorized_disabled', ?, ?)`)
+        .bind(crypto.randomUUID(), input.tenantId, input.id, input.actorId, JSON.stringify({ external_shop_id_digest: canonicalDigest(input.externalShopId), scopes: input.scopes, token_version: nextVersion }), input.now),
+    ]);
+    if ((results[1]?.meta.changes ?? 0) !== 1) throw new Error("credential_rotation_conflict");
   }
 
   async acceptTitleCommand(input: TitleCommandInput, authority: AuthoritySnapshot, now: string): Promise<{ operation: TitleOperation; duplicate: boolean }> {

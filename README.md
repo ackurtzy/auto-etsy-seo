@@ -13,8 +13,11 @@ engine, independent Python reference, frozen evidence contracts, and offline
 release simulations. G2 awaits the owner's H2 interpretation and product-route
 decision. Phase 3 now has a production-shaped Cloudflare title-operation
 foundation, strict local F01-F15 evidence, encrypted Etsy OAuth/token rotation,
-and an exact-diff/recovery UI. G3a deployment and H3 are not yet run, so all
-write gates remain disabled. The v1 Etsy/OpenAI runtime remains quarantined.
+and an exact-diff/recovery UI. Phase 4 adds the owner-facing G1–G3 workspace,
+server-owned gate protocols, revision-bound approvals, a bounded sanitized G1
+collector, and private evidence attachments. G3a deployment and H3 are not yet
+run, so all write gates remain disabled. The v1 Etsy/OpenAI runtime remains
+quarantined.
 
 The only live capability is bounded Phase 1 validation for the owner's shop as
 recorded in the signed, ignored G0 evidence. Nothing enables Etsy writes, AI
@@ -31,6 +34,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s validation -p 'test_*.
 PYTHONDONTWRITEBYTECODE=1 python3 validation/phase1/validate_phase1.py
 PYTHONDONTWRITEBYTECODE=1 python3 validation/phase2/validate_phase2.py
 PYTHONDONTWRITEBYTECODE=1 python3 validation/phase3/validate_phase3.py
+PYTHONDONTWRITEBYTECODE=1 python3 validation/phase4/validate_phase4.py
 ```
 
 ## Legacy runtime
@@ -91,3 +95,11 @@ read-reconciled and never replayed.
 See `docs/rebuild/phase3-foundation.md` for local verification and the exact
 G3a → H3 deployment sequence. The checked-in configuration denies Etsy egress,
 denies title writes, and creates new connections with zero write allowance.
+
+## Phase 4 gate workspace
+
+The new web application explains and records the human portions of G1–G3. It
+derives tenant and shop scope from the authenticated session, never accepts
+client-authored authoritative evidence, and keeps Etsy read egress separate
+from title-write egress. See `docs/rebuild/phase4-gate-workspace.md` for the
+workflow and safety boundary.

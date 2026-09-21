@@ -6,6 +6,7 @@ export type SecretBindings = {
   CREDENTIAL_ENCRYPTION_KEY: string;
   RESEND_API_KEY: string;
   INCIDENT_EMAIL: string;
+  ETSY_READ_EGRESS_ENABLED: string;
 };
 
 export type AppEnv = Env & SecretBindings;

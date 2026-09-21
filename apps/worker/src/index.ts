@@ -6,6 +6,9 @@ import type { AppEnv } from "./env.ts";
 import { OperationRepository } from "./repository.ts";
 import { verifyKeep } from "./runtime.ts";
 import { finishEtsyOAuth, startEtsyOAuth } from "./oauth.ts";
+import { GateRepository } from "./gate-repository.ts";
+import { collectGate1Evidence } from "./g1-collector.ts";
+import { prepareGateProtocol } from "./gate-protocols.ts";
 
 export { ShopCoordinator } from "./coordinator.ts";
 export { OperationWorkflow } from "./workflow.ts";
@@ -35,8 +38,19 @@ const revertSchema = keepSchema.extend({
     capabilityEpoch: z.number().int().positive(),
   }).strict(),
 }).strict();
-const oauthStartSchema = z.object({ externalShopId: z.string().regex(/^\d+$/) }).strict();
+const oauthStartSchema = z.object({
+  externalShopId: z.string().regex(/^\d+$/),
+  accessMode: z.enum(["read_only", "title_canary"]).default("read_only"),
+}).strict();
+const gateResponseSchema = z.object({
+  outcome: z.enum(["matched", "resolved_difference", "unavailable_disabled", "differs", "cannot_verify"]),
+  note: z.string().max(2000).default(""),
+  evidenceRevision: z.string().min(1).max(128),
+}).strict();
+const gateApprovalSchema = z.object({ disposition: z.string().min(1).max(160) }).strict();
 const MAX_REQUEST_BYTES = 65_536;
+const MAX_ARTIFACT_BYTES = 10_485_760;
+const ARTIFACT_MEDIA_TYPES = new Set(["image/png", "image/jpeg", "application/pdf", "application/json"]);
 
 async function readBoundedJson(request: Request): Promise<unknown> {
   if (!request.body) return null;
@@ -68,7 +82,9 @@ async function readBoundedJson(request: Request): Promise<unknown> {
 
 app.use("*", async (c, next) => {
   const length = Number(c.req.header("content-length") ?? "0");
-  if (Number.isFinite(length) && length > 65_536) return c.json({ error: { code: "request_too_large" } }, 413);
+  const artifactUpload = /\/gates\/runs\/[^/]+\/items\/[^/]+\/artifacts$/.test(c.req.path) && c.req.method === "POST";
+  const limit = artifactUpload ? MAX_ARTIFACT_BYTES : MAX_REQUEST_BYTES;
+  if (Number.isFinite(length) && length > limit) return c.json({ error: { code: "request_too_large" } }, 413);
   await next();
   c.header("x-content-type-options", "nosniff");
   c.header("referrer-policy", "no-referrer");
@@ -79,6 +95,7 @@ app.use("*", async (c, next) => {
 app.get("/health", (c) => c.json({
   status: "ok",
   environment: c.env.ENVIRONMENT,
+  etsyReadEgressEnabled: String(c.env.ETSY_READ_EGRESS_ENABLED) === "true",
   etsyEgressEnabled: String(c.env.ETSY_EGRESS_ENABLED) === "true",
   titleWritesEnabled: String(c.env.TITLE_WRITES_ENABLED) === "true",
   executorVersion: c.env.EXECUTOR_VERSION,
@@ -96,7 +113,7 @@ app.post("/api/v1/tenants/:tenantId/oauth/etsy/start", async (c) => {
   const parsed = oauthStartSchema.safeParse(await readBoundedJson(c.req.raw));
   if (!parsed.success) return c.json({ error: { code: "contract_invalid" } }, 400);
   const authorizationUrl = await startEtsyOAuth(c.env, {
-    tenantId: c.req.param("tenantId"), actorId: c.get("actorId"), externalShopId: parsed.data.externalShopId,
+    tenantId: c.req.param("tenantId"), actorId: c.get("actorId"), externalShopId: parsed.data.externalShopId, accessMode: parsed.data.accessMode,
   });
   return c.json({ authorizationUrl });
 });
@@ -107,6 +124,81 @@ app.get("/api/v1/oauth/etsy/callback", async (c) => {
   if (!state || !code) return c.json({ error: { code: "oauth_callback_invalid" } }, 400);
   const result = await finishEtsyOAuth(c.env, { state, code, actorId: c.get("actorId") });
   return c.redirect(`/?connected=${encodeURIComponent(result.shopConnectionId)}`, 303);
+});
+
+app.get("/api/v1/session", async (c) => {
+  return c.json(await new GateRepository(c.env.DB).listSession(c.get("actorId")));
+});
+
+app.get("/api/v1/tenants/:tenantId/shops/:shopId/gates", async (c) => {
+  const repository = new GateRepository(c.env.DB);
+  return c.json(await repository.listGates({ tenantId: c.req.param("tenantId"), shopId: c.req.param("shopId"), actorId: c.get("actorId") }));
+});
+
+app.post("/api/v1/tenants/:tenantId/shops/:shopId/gates/G1/collect", async (c) => {
+  return c.json(await collectGate1Evidence(c.env, {
+    tenantId: c.req.param("tenantId"),
+    shopId: c.req.param("shopId"),
+    actorId: c.get("actorId"),
+  }, new Date()), 201);
+});
+
+app.post("/api/v1/tenants/:tenantId/shops/:shopId/gates/:gateId/prepare", async (c) => {
+  const gateId = z.enum(["G2", "G3"]).safeParse(c.req.param("gateId"));
+  if (!gateId.success) return c.json({ error: { code: "contract_invalid" } }, 400);
+  const repository = new GateRepository(c.env.DB);
+  return c.json(await prepareGateProtocol(repository, {
+    tenantId: c.req.param("tenantId"), shopId: c.req.param("shopId"), actorId: c.get("actorId"),
+  }, gateId.data, new Date()), 201);
+});
+
+app.get("/api/v1/tenants/:tenantId/shops/:shopId/gates/runs/:runId", async (c) => {
+  return c.json(await new GateRepository(c.env.DB).getRun(
+    { tenantId: c.req.param("tenantId"), shopId: c.req.param("shopId"), actorId: c.get("actorId") },
+    c.req.param("runId"),
+  ));
+});
+
+app.post("/api/v1/tenants/:tenantId/shops/:shopId/gates/runs/:runId/items/:itemId/responses", async (c) => {
+  const parsed = gateResponseSchema.safeParse(await readBoundedJson(c.req.raw));
+  if (!parsed.success) return c.json({ error: { code: "contract_invalid" } }, 400);
+  const repository = new GateRepository(c.env.DB);
+  const scope = { tenantId: c.req.param("tenantId"), shopId: c.req.param("shopId"), actorId: c.get("actorId") };
+  await repository.recordResponse(scope, c.req.param("runId"), c.req.param("itemId"), parsed.data.outcome, parsed.data.note, parsed.data.evidenceRevision, new Date().toISOString());
+  return c.json(await repository.getRun(scope, c.req.param("runId")), 201);
+});
+
+app.post("/api/v1/tenants/:tenantId/shops/:shopId/gates/runs/:runId/items/:itemId/artifacts", async (c) => {
+  const mediaType = (c.req.header("content-type") ?? "").split(";", 1)[0]!.trim().toLowerCase();
+  const claimedSha256 = c.req.header("x-content-sha256") ?? "";
+  if (!ARTIFACT_MEDIA_TYPES.has(mediaType) || !/^[a-f0-9]{64}$/.test(claimedSha256)) return c.json({ error: { code: "artifact_contract_invalid" } }, 400);
+  const bytes = await readBoundedBytes(c.req.raw, MAX_ARTIFACT_BYTES);
+  if (bytes.byteLength === 0) return c.json({ error: { code: "artifact_contract_invalid" } }, 400);
+  const digestSource = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  const actualSha256 = [...new Uint8Array(await crypto.subtle.digest("SHA-256", digestSource))].map((value) => value.toString(16).padStart(2, "0")).join("");
+  if (actualSha256 !== claimedSha256) return c.json({ error: { code: "artifact_digest_mismatch" } }, 400);
+  const scope = { tenantId: c.req.param("tenantId"), shopId: c.req.param("shopId"), actorId: c.get("actorId") };
+  const r2Key = `gate-evidence/${c.req.param("runId")}/${crypto.randomUUID()}`;
+  await c.env.RECOVERY_BUCKET.put(r2Key, bytes, { httpMetadata: { contentType: mediaType }, customMetadata: { sha256: actualSha256 } });
+  try {
+    await new GateRepository(c.env.DB).recordArtifact(scope, {
+      runId: c.req.param("runId"), itemId: c.req.param("itemId"), r2Key, mediaType,
+      byteLength: bytes.byteLength, contentSha256: actualSha256,
+    }, new Date().toISOString());
+  } catch (error) {
+    await c.env.RECOVERY_BUCKET.delete(r2Key);
+    throw error;
+  }
+  return c.json({ contentSha256: actualSha256, byteLength: bytes.byteLength }, 201);
+});
+
+app.post("/api/v1/tenants/:tenantId/shops/:shopId/gates/runs/:runId/approve", async (c) => {
+  const parsed = gateApprovalSchema.safeParse(await readBoundedJson(c.req.raw));
+  if (!parsed.success) return c.json({ error: { code: "contract_invalid" } }, 400);
+  const repository = new GateRepository(c.env.DB);
+  const scope = { tenantId: c.req.param("tenantId"), shopId: c.req.param("shopId"), actorId: c.get("actorId") };
+  await repository.approve(scope, c.req.param("runId"), parsed.data.disposition, new Date().toISOString());
+  return c.json(await repository.getRun(scope, c.req.param("runId")));
 });
 
 app.post("/api/v1/tenants/:tenantId/shops/:shopId/title-commands", async (c) => {
@@ -193,6 +285,12 @@ app.onError((error, c) => {
     "runtime_egress_gate_disabled",
     "oauth_state_invalid", "oauth_shop_identity_mismatch", "oauth_callback_invalid",
     "request_too_large",
+    "gate_items_invalid", "gate_evidence_stale", "gate_item_not_found", "gate_run_not_found", "gate_not_approvable",
+    "collection_authority_not_found", "collection_scopes_missing", "collection_budget_invalid", "collection_daily_budget_exhausted",
+    "runtime_read_egress_gate_disabled", "collection_evidence_empty", "collection_pagination_limit_exceeded",
+    "artifact_contract_invalid", "artifact_digest_mismatch",
+    "gate_dependency_not_approved",
+    "gate_run_closed", "gate_already_approved", "gate_approval_conflict", "gate_disposition_invalid",
   ]);
   const code = safeCodes.has(known) ? known : "internal_error";
   console.error(JSON.stringify({ level: "error", code, requestId: c.req.header("cf-ray") ?? crypto.randomUUID() }));
@@ -219,3 +317,24 @@ function publicOperation(operation: TitleOperation) {
 }
 
 export default app;
+
+async function readBoundedBytes(request: Request, limit: number): Promise<Uint8Array> {
+  if (!request.body) return new Uint8Array();
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limit) {
+      await reader.cancel();
+      throw new Error("request_too_large");
+    }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return bytes;
+}

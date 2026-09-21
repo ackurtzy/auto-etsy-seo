@@ -91,3 +91,42 @@ test("authorized-shop discovery is bound to the token subject", async () => {
   assert.deepEqual(await client.getAuthorizedShopIds(), ["2002"]);
   assert.equal(requested, "https://openapi.etsy.com/v3/application/users/12345/shops?limit=100");
 });
+
+test("read-only collection whitelists listing and receipt fields and never retains buyer data", async () => {
+  const client = new EtsyClient({
+    apiKey: "key",
+    accessToken: "12345.access-token",
+    fetcher: async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname.endsWith("/listings")) return Response.json({ count: 1, results: [{
+        listing_id: 1001, title: "Botanical &amp; Notes", state: "active", views: 42,
+        created_timestamp: 100, updated_timestamp: 200, tags: ["paper"], description: "do not retain",
+      }] });
+      return Response.json({ count: 1, results: [{
+        receipt_id: 9001, created_timestamp: 300, was_paid: true, name: "Private Buyer", first_line: "Private address",
+        transactions: [{ transaction_id: 7001, listing_id: 1001, quantity: 2, price: { amount: 1200, divisor: 100, currency_code: "USD" }, personalization: "private" }],
+        refunds: [],
+      }] });
+    },
+  });
+  const listings = await client.getListingsByShop("2002", "active", 0, 100);
+  const receipts = await client.getShopReceipts("2002", 0, 0, 100);
+  assert.deepEqual(listings.results[0], { listingId: "1001", title: "Botanical & Notes", state: "active", views: 42, createdTimestamp: 100, updatedTimestamp: 200, tags: ["paper"] });
+  assert.equal(JSON.stringify(receipts).includes("Private"), false);
+  assert.deepEqual(receipts.results[0]?.transactions[0], { transactionId: "7001", listingId: "1001", quantity: 2, price: { amount: 1200, divisor: 100, currencyCode: "USD" } });
+});
+
+test("read-only collection uses bounded pagination parameters and manual redirects", async () => {
+  const calls: Array<{ url: URL; init: RequestInit }> = [];
+  const client = new EtsyClient({ apiKey: "key", accessToken: "token", fetcher: async (input, init) => {
+    calls.push({ url: new URL(String(input)), init: init ?? {} });
+    return Response.json({ count: 0, results: [] });
+  } });
+  await client.getListingsByShop("2002", "inactive", 100, 50);
+  await client.getShopReceipts("2002", 1_700_000_000, 200, 100);
+  assert.equal(calls[0]?.url.searchParams.get("state"), "inactive");
+  assert.equal(calls[0]?.url.searchParams.get("offset"), "100");
+  assert.equal(calls[0]?.url.searchParams.get("limit"), "50");
+  assert.equal(calls[1]?.url.searchParams.get("min_created"), "1700000000");
+  assert.equal(calls[1]?.init.redirect, "manual");
+});

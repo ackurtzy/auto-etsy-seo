@@ -22,7 +22,7 @@ function inputFromOperation(operation: TitleOperation) {
   } as const;
 }
 
-async function accessToken(env: AppEnv, repository: OperationRepository, credential: CredentialRow, now: Date): Promise<string> {
+export async function loadAccessToken(env: AppEnv, repository: OperationRepository, credential: CredentialRow, now: Date): Promise<string> {
   const vault = await CredentialVault.fromBase64Key(env.CREDENTIAL_ENCRYPTION_KEY);
   const context = { tenantId: credential.tenant_id, shopId: credential.shop_connection_id, version: credential.version };
   if (Date.parse(credential.expires_at) - now.getTime() > 120_000) {
@@ -59,7 +59,7 @@ export async function verifyKeep(
   if (!authority.scopes.includes("listings_r")) throw new Error("required_scope_missing");
   if (String(env.ETSY_EGRESS_ENABLED) !== "true") throw new Error("runtime_egress_gate_disabled");
   const credential = await repository.loadCredential(parent.shopId);
-  const token = await accessToken(env, repository, credential, new Date());
+  const token = await loadAccessToken(env, repository, credential, new Date());
   const etsy = new EtsyClient({ apiKey: env.ETSY_API_KEY, accessToken: token, baseUrl: env.ETSY_BASE_URL });
   const observed = await etsy.getListing(parent.listingId);
   return repository.recordKeep(parent, actorId, idempotencyKey, observed.title, new Date().toISOString());
@@ -85,7 +85,7 @@ export async function executeOrReconcile(env: AppEnv, operationId: string): Prom
     return "cancelled_before_dispatch";
   }
   const credential = await repository.loadCredential(operation.shopId);
-  const token = await accessToken(env, repository, credential, now);
+  const token = await loadAccessToken(env, repository, credential, now);
   const etsy = new EtsyClient({ apiKey: env.ETSY_API_KEY, accessToken: token, baseUrl: env.ETSY_BASE_URL });
   const fresh = await etsy.getListing(operation.listingId);
   if (!(await repository.prepare(operation, fresh.title, now.toISOString()))) return "conflict";
@@ -134,7 +134,7 @@ async function reconcile(env: AppEnv, repository: OperationRepository, operation
     await repository.requireManual(operation, "credential_unavailable_during_reconciliation", now.toISOString());
     return "manual_required";
   }
-  const token = await accessToken(env, repository, credential, now);
+  const token = await loadAccessToken(env, repository, credential, now);
   const etsy = new EtsyClient({ apiKey: env.ETSY_API_KEY, accessToken: token, baseUrl: env.ETSY_BASE_URL });
   const reads = await repository.incrementReconciliation(operation.id, now.toISOString());
   try {

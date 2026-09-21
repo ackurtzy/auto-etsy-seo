@@ -10,11 +10,15 @@
     "typecheck:phase2": "tsc -p tsconfig.phase2.json --noEmit",
     "test:phase3": "node --test packages/operations/test/*.test.ts packages/etsy/test/*.test.ts packages/security/test/*.test.ts",
     "typecheck:phase3": "tsc -p tsconfig.phase3.json --noEmit",
+    "test:phase4": "node --test packages/gates/test/*.test.ts",
+    "typecheck:phase4": "tsc -p tsconfig.phase4.json --noEmit",
     "cf:types": "wrangler types --config apps/worker/wrangler.jsonc apps/worker/src/worker-configuration.d.ts",
     "cf:dry-run": "wrangler deploy --dry-run --config apps/worker/wrangler.jsonc --outdir .phase3-dist",
     "db:migrate:local": "wrangler d1 migrations apply auto-etsy-seo-local --local --config apps/worker/wrangler.jsonc",
     "build:web": "vite build --config apps/web/vite.config.ts",
-    "build:phase3": "npm run build:web && npm run cf:dry-run"
+    "dev:web": "vite --config apps/web/vite.config.ts",
+    "build:phase3": "npm run build:web && npm run cf:dry-run",
+    "build:phase4": "npm run typecheck:phase4 && npm run test:phase4 && npm run build:web && npm run cf:dry-run"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "5.20260921.1",

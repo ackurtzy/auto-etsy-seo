@@ -22,6 +22,7 @@ python3 -m unittest discover -s validation -p 'test_*.py' -v
 python3 validation/phase1/validate_phase1.py
 python3 validation/phase2/validate_phase2.py
 python3 validation/phase3/validate_phase3.py
+python3 validation/phase4/validate_phase4.py
 ```
 
 The legacy runtime is preserved by Git tag `legacy-v1-2026-09-20` and is hard
@@ -47,3 +48,8 @@ Phase 3 implementation and credential-free local fault evidence are in
 `packages/security`, `migrations`, and `validation/phase3`. Local A3 evidence
 does not pass G3: deployed simulator/Cloudflare evidence and the exact owner H3
 canary remain required, and all checked-in write controls default off.
+
+Phase 4's owner gate workspace is documented in
+`phase4-gate-workspace.md`. It makes G1–G3 legible and operable while keeping
+their evidence and dependency rules on the server. The separate read-egress
+switch, write-egress switch, and title-write switch all default off.

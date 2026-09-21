@@ -11,6 +11,65 @@ const shopListSchema = z.object({
   results: z.array(z.object({ shop_id: z.union([z.number().int().positive(), z.string().regex(/^\d+$/)]) }).passthrough()),
 }).passthrough();
 
+const idSchema = z.union([z.number().int().nonnegative(), z.string().regex(/^\d+$/)]);
+const moneySchema = z.object({
+  amount: z.number().int(),
+  divisor: z.number().int().positive(),
+  currency_code: z.string().min(3).max(3),
+}).passthrough();
+const collectedListingSchema = z.object({
+  listing_id: idSchema,
+  title: z.string(),
+  state: z.string(),
+  views: z.number().int().nonnegative(),
+  created_timestamp: z.number().int().nonnegative(),
+  updated_timestamp: z.number().int().nonnegative(),
+  tags: z.array(z.string()),
+}).passthrough();
+const collectedTransactionSchema = z.object({
+  transaction_id: idSchema,
+  listing_id: idSchema,
+  quantity: z.number().int().positive(),
+  price: moneySchema,
+}).passthrough();
+const collectedRefundSchema = z.object({
+  amount: moneySchema.optional(),
+  status: z.string().optional(),
+  created_timestamp: z.number().int().nonnegative().optional(),
+}).passthrough();
+const collectedReceiptSchema = z.object({
+  receipt_id: idSchema,
+  created_timestamp: z.number().int().nonnegative(),
+  updated_timestamp: z.number().int().nonnegative().optional(),
+  was_paid: z.boolean(),
+  was_canceled: z.boolean().optional(),
+  transactions: z.array(collectedTransactionSchema),
+  refunds: z.array(collectedRefundSchema).default([]),
+}).passthrough();
+const listingPageSchema = z.object({ count: z.number().int().nonnegative(), results: z.array(collectedListingSchema) }).passthrough();
+const receiptPageSchema = z.object({ count: z.number().int().nonnegative(), results: z.array(collectedReceiptSchema) }).passthrough();
+
+export interface SafeMoney { amount: number; divisor: number; currencyCode: string }
+export interface SafeListing {
+  listingId: string;
+  title: string;
+  state: string;
+  views: number;
+  createdTimestamp: number;
+  updatedTimestamp: number;
+  tags: string[];
+}
+export interface SafeReceipt {
+  receiptId: string;
+  createdTimestamp: number;
+  updatedTimestamp?: number;
+  wasPaid: boolean;
+  wasCanceled: boolean;
+  transactions: Array<{ transactionId: string; listingId: string; quantity: number; price: SafeMoney }>;
+  refunds: Array<{ amount?: SafeMoney; status?: string; createdTimestamp?: number }>;
+}
+export interface EtsyPage<T> { count: number; results: T[] }
+
 export class EtsyTransportError extends Error {
   readonly code: string;
   readonly status?: number;
@@ -76,6 +135,57 @@ export class EtsyClient {
     return parsed.data.results.map((shop) => String(shop.shop_id));
   }
 
+  async getListingsByShop(shopId: string, state: string, offset: number, limit: number): Promise<EtsyPage<SafeListing>> {
+    assertPageBounds(offset, limit);
+    if (!/^[a-z_]+$/.test(state)) throw new EtsyTransportError("collection_parameter_invalid");
+    const query = new URLSearchParams({ state, offset: String(offset), limit: String(limit) });
+    const payload = await this.request(`/application/shops/${encodeURIComponent(shopId)}/listings?${query.toString()}`, { method: "GET" });
+    const parsed = listingPageSchema.safeParse(payload);
+    if (!parsed.success) throw new EtsyTransportError("response_schema_invalid");
+    return {
+      count: parsed.data.count,
+      results: parsed.data.results.map((listing) => ({
+        listingId: String(listing.listing_id),
+        title: decodeHtmlEntities(listing.title),
+        state: listing.state,
+        views: listing.views,
+        createdTimestamp: listing.created_timestamp,
+        updatedTimestamp: listing.updated_timestamp,
+        tags: [...listing.tags],
+      })),
+    };
+  }
+
+  async getShopReceipts(shopId: string, minCreated: number, offset: number, limit: number): Promise<EtsyPage<SafeReceipt>> {
+    assertPageBounds(offset, limit);
+    if (!Number.isSafeInteger(minCreated) || minCreated < 0) throw new EtsyTransportError("collection_parameter_invalid");
+    const query = new URLSearchParams({ min_created: String(minCreated), offset: String(offset), limit: String(limit) });
+    const payload = await this.request(`/application/shops/${encodeURIComponent(shopId)}/receipts?${query.toString()}`, { method: "GET" });
+    const parsed = receiptPageSchema.safeParse(payload);
+    if (!parsed.success) throw new EtsyTransportError("response_schema_invalid");
+    return {
+      count: parsed.data.count,
+      results: parsed.data.results.map((receipt) => ({
+        receiptId: String(receipt.receipt_id),
+        createdTimestamp: receipt.created_timestamp,
+        ...(receipt.updated_timestamp === undefined ? {} : { updatedTimestamp: receipt.updated_timestamp }),
+        wasPaid: receipt.was_paid,
+        wasCanceled: receipt.was_canceled ?? false,
+        transactions: receipt.transactions.map((transaction) => ({
+          transactionId: String(transaction.transaction_id),
+          listingId: String(transaction.listing_id),
+          quantity: transaction.quantity,
+          price: safeMoney(transaction.price),
+        })),
+        refunds: receipt.refunds.map((refund) => ({
+          ...(refund.amount === undefined ? {} : { amount: safeMoney(refund.amount) }),
+          ...(refund.status === undefined ? {} : { status: refund.status }),
+          ...(refund.created_timestamp === undefined ? {} : { createdTimestamp: refund.created_timestamp }),
+        })),
+      })),
+    };
+  }
+
   private async request(path: string, init: RequestInit): Promise<unknown> {
     return boundedJson(await this.rawRequest(path, init, false));
   }
@@ -105,6 +215,25 @@ export class EtsyClient {
     }
     return response;
   }
+}
+
+function assertPageBounds(offset: number, limit: number): void {
+  if (!Number.isSafeInteger(offset) || offset < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    throw new EtsyTransportError("collection_parameter_invalid");
+  }
+}
+
+function safeMoney(value: z.infer<typeof moneySchema>): SafeMoney {
+  return { amount: value.amount, divisor: value.divisor, currencyCode: value.currency_code };
+}
+
+function decodeHtmlEntities(value: string): string {
+  const named: Record<string, string> = { amp: "&", quot: '"', apos: "'", lt: "<", gt: ">", nbsp: " " };
+  return value.replace(/&(#\d+|#x[0-9a-f]+|amp|quot|apos|lt|gt|nbsp);/gi, (match, entity: string) => {
+    if (entity[0] !== "#") return named[entity.toLowerCase()] ?? match;
+    const codePoint = entity[1]?.toLowerCase() === "x" ? Number.parseInt(entity.slice(2), 16) : Number.parseInt(entity.slice(1), 10);
+    return Number.isSafeInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10ffff ? String.fromCodePoint(codePoint) : match;
+  });
 }
 
 async function boundedJson(response: Response): Promise<unknown> {

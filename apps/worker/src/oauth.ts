@@ -4,7 +4,10 @@ import { CredentialVault } from "../../../packages/security/src/credential-vault
 import type { AppEnv } from "./env.ts";
 import { OperationRepository } from "./repository.ts";
 
-const scopes = ["listings_r", "listings_w", "shops_r"];
+const scopeModes = {
+  read_only: ["listings_r", "transactions_r", "shops_r"],
+  title_canary: ["listings_r", "transactions_r", "shops_r", "listings_w"],
+} as const;
 
 function base64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -26,9 +29,10 @@ interface OAuthStateRow {
   redirect_uri: string;
   expires_at: string;
   consumed_at: string | null;
+  requested_scopes_json: string;
 }
 
-export async function startEtsyOAuth(env: AppEnv, input: { tenantId: string; actorId: string; externalShopId: string }): Promise<string> {
+export async function startEtsyOAuth(env: AppEnv, input: { tenantId: string; actorId: string; externalShopId: string; accessMode: keyof typeof scopeModes }): Promise<string> {
   await new OperationRepository(env.DB).assertTenantOwner(input.tenantId, input.actorId);
   const verifierBytes = crypto.getRandomValues(new Uint8Array(48));
   const verifier = base64Url(verifierBytes);
@@ -39,10 +43,10 @@ export async function startEtsyOAuth(env: AppEnv, input: { tenantId: string; act
   const now = new Date();
   const expiresAt = new Date(now.getTime() + 10 * 60 * 1000).toISOString();
   await env.DB.prepare(`
-    INSERT INTO oauth_states(state_digest,tenant_id,actor_id,expected_external_shop_id,verifier_algorithm,verifier_nonce,verifier_ciphertext,redirect_uri,expires_at,created_at)
-    VALUES(?,?,?,?,'AES-GCM-256',?,?,?,?,?)
-  `).bind(canonicalDigest(state), input.tenantId, input.actorId, input.externalShopId, encrypted.nonce, encrypted.ciphertext, redirectUri, expiresAt, now.toISOString()).run();
-  return buildEtsyAuthorizationUrl({ clientId: env.ETSY_CLIENT_ID, redirectUri, state, codeChallenge: await challenge(verifier), scopes });
+    INSERT INTO oauth_states(state_digest,tenant_id,actor_id,expected_external_shop_id,verifier_algorithm,verifier_nonce,verifier_ciphertext,redirect_uri,expires_at,requested_scopes_json,created_at)
+    VALUES(?,?,?,?,'AES-GCM-256',?,?,?,?,?,?)
+  `).bind(canonicalDigest(state), input.tenantId, input.actorId, input.externalShopId, encrypted.nonce, encrypted.ciphertext, redirectUri, expiresAt, JSON.stringify(scopeModes[input.accessMode]), now.toISOString()).run();
+  return buildEtsyAuthorizationUrl({ clientId: env.ETSY_CLIENT_ID, redirectUri, state, codeChallenge: await challenge(verifier), scopes: [...scopeModes[input.accessMode]] });
 }
 
 export async function finishEtsyOAuth(env: AppEnv, input: { state: string; code: string; actorId: string }): Promise<{ shopConnectionId: string }> {
@@ -56,22 +60,26 @@ export async function finishEtsyOAuth(env: AppEnv, input: { state: string; code:
   const vault = await CredentialVault.fromBase64Key(env.CREDENTIAL_ENCRYPTION_KEY);
   const verifier = await vault.decrypt({ algorithm: "AES-GCM-256", nonce: row.verifier_nonce, ciphertext: row.verifier_ciphertext }, { tenantId: row.tenant_id, shopId: "oauth-state", version: 1 });
   const token = await exchangeEtsyAuthorizationCode({ clientId: env.ETSY_CLIENT_ID, redirectUri: row.redirect_uri, code: input.code, codeVerifier: verifier });
+  const scopes = parseScopes(row.requested_scopes_json);
   const etsy = new EtsyClient({ apiKey: env.ETSY_API_KEY, accessToken: token.accessToken, baseUrl: env.ETSY_BASE_URL });
   const authorizedShopIds = await etsy.getAuthorizedShopIds();
   if (!authorizedShopIds.includes(row.expected_external_shop_id)) throw new Error("oauth_shop_identity_mismatch");
-  const shopConnectionId = crypto.randomUUID();
-  const context = { tenantId: row.tenant_id, shopId: shopConnectionId, version: 1 };
+  const repository = new OperationRepository(env.DB);
+  const existing = await repository.findShopConnection(row.tenant_id, row.expected_external_shop_id);
+  const shopConnectionId = existing?.id ?? crypto.randomUUID();
+  const context = { tenantId: row.tenant_id, shopId: shopConnectionId, version: existing ? existing.tokenVersion + 1 : 1 };
   const [access, refresh] = await Promise.all([vault.encrypt(token.accessToken, context), vault.encrypt(token.refreshToken, context)]);
-  await new OperationRepository(env.DB).createShopConnection({
-    id: shopConnectionId,
-    tenantId: row.tenant_id,
-    actorId: row.actor_id,
-    externalShopId: row.expected_external_shop_id,
-    scopes,
-    access,
-    refresh,
-    expiresAt: new Date(now.getTime() + token.expiresInSeconds * 1000).toISOString(),
-    now: now.toISOString(),
-  });
+  const connection = {
+    id: shopConnectionId, tenantId: row.tenant_id, actorId: row.actor_id, externalShopId: row.expected_external_shop_id,
+    scopes, access, refresh, expiresAt: new Date(now.getTime() + token.expiresInSeconds * 1000).toISOString(), now: now.toISOString(),
+  };
+  if (existing) await repository.reauthorizeShopConnection({ ...connection, currentVersion: existing.tokenVersion });
+  else await repository.createShopConnection(connection);
   return { shopConnectionId };
+}
+
+function parseScopes(raw: string): string[] {
+  const parsed = JSON.parse(raw) as unknown;
+  if (!Array.isArray(parsed) || !parsed.every((scope) => typeof scope === "string")) throw new Error("oauth_state_invalid");
+  return [...new Set(parsed)];
 }
