@@ -51,6 +51,20 @@ disabled.
 
 ## Local verification
 
+For an owner-supervised local review, the Worker also supports an explicit
+`LOCAL_OWNER_MODE=true` switch. The bypass is accepted only when
+`ENVIRONMENT=local` and the request hostname is `127.0.0.1`, `localhost`, or
+`[::1]`; every deployed environment continues through Clerk. The frontend must
+separately receive `VITE_LOCAL_OWNER_MODE=true`. Neither switch is present in a
+production build or deployment configuration, and neither changes the Etsy
+egress or title-write switches.
+
+The current owner's local workspace may be seeded from the ignored, sanitized
+Phase 1 evidence. That local import must verify complete listing and receipt
+coverage plus `buyer_data_persisted=false`, bind the evidence digest, and keep
+the shop write lane paused, both capabilities disabled, and the daily write
+limit at zero. It must not copy OAuth credentials or buyer data.
+
 These commands match CI and use no credentials or live network calls:
 
 ```bash

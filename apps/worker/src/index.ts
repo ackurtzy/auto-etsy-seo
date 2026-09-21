@@ -9,6 +9,7 @@ import { finishEtsyOAuth, startEtsyOAuth } from "./oauth.ts";
 import { GateRepository } from "./gate-repository.ts";
 import { collectGate1Evidence } from "./g1-collector.ts";
 import { prepareGateProtocol } from "./gate-protocols.ts";
+import { resolveLocalOwnerActor } from "./local-auth.ts";
 
 export { ShopCoordinator } from "./coordinator.ts";
 export { OperationWorkflow } from "./workflow.ts";
@@ -101,12 +102,23 @@ app.get("/health", (c) => c.json({
   executorVersion: c.env.EXECUTOR_VERSION,
 }));
 
-app.use("/api/v1/*", clerkMiddleware());
+const authenticateWithClerk = clerkMiddleware();
 app.use("/api/v1/*", async (c, next) => {
-  const auth = getAuth(c);
-  if (!auth?.userId) return c.json({ error: { code: "unauthorized" } }, 401);
-  c.set("actorId", auth.userId);
-  await next();
+  const localActor = resolveLocalOwnerActor(c.env, c.req.raw);
+  if (localActor) {
+    c.set("actorId", localActor);
+    await next();
+    return;
+  }
+  return authenticateWithClerk(c, async () => {
+    const auth = getAuth(c);
+    if (!auth?.userId) {
+      c.res = c.json({ error: { code: "unauthorized" } }, 401);
+      return;
+    }
+    c.set("actorId", auth.userId);
+    await next();
+  });
 });
 
 app.post("/api/v1/tenants/:tenantId/oauth/etsy/start", async (c) => {

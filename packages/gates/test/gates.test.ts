@@ -8,6 +8,7 @@ import {
   selectRepresentativeReceipts,
   type GateReviewSnapshot,
 } from "../src/index.ts";
+import { resolveLocalOwnerActor } from "../../../apps/worker/src/local-auth.ts";
 
 function snapshot(overrides: Partial<GateReviewSnapshot> = {}): GateReviewSnapshot {
   return {
@@ -105,4 +106,13 @@ test("G2 and G3 remain dependency locked and preserve the title-only boundary", 
   assert.deepEqual(gateDefinitions.G3.enabledCapabilities, ["title_T3"]);
   assert.ok(gateDefinitions.G3.explicitlyDisabledCapabilities.includes("tags_T3"));
   assert.ok(gateDefinitions.G3.explicitlyDisabledCapabilities.includes("general_etsy_egress"));
+});
+
+test("local owner mode is limited to an explicit local environment and loopback host", () => {
+  const env = { ENVIRONMENT: "local", LOCAL_OWNER_MODE: "true" };
+  assert.equal(resolveLocalOwnerActor(env as never, new Request("http://127.0.0.1:8787/api/v1/session")), "local-owner");
+  assert.equal(resolveLocalOwnerActor(env as never, new Request("http://localhost:8787/api/v1/session")), "local-owner");
+  assert.equal(resolveLocalOwnerActor({ ...env, ENVIRONMENT: "staging" } as never, new Request("https://seo.adesignsdenver.com/api/v1/session")), null);
+  assert.equal(resolveLocalOwnerActor(env as never, new Request("https://seo.adesignsdenver.com/api/v1/session")), null);
+  assert.equal(resolveLocalOwnerActor({ ...env, LOCAL_OWNER_MODE: "false" } as never, new Request("http://127.0.0.1:8787/api/v1/session")), null);
 });

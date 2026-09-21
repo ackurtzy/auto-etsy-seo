@@ -7,6 +7,7 @@ export type SecretBindings = {
   RESEND_API_KEY: string;
   INCIDENT_EMAIL: string;
   ETSY_READ_EGRESS_ENABLED: string;
+  LOCAL_OWNER_MODE: string;
 };
 
 export type AppEnv = Env & SecretBindings;
