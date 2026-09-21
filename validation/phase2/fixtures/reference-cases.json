@@ -1,0 +1,48 @@
+{
+  "schema_version": "phase2-reference-cases-v1",
+  "cases": [
+    {
+      "case_id": "unequal_clusters_baseline_conversion",
+      "alpha": 0.05,
+      "baseline_days": 4,
+      "outcome_days": 2,
+      "allocation_seed": "reference-unequal",
+      "clusters": [
+        {"cluster_id": "a", "listing_count": 1, "arm": "treatment", "baseline_total": 20, "outcome_total": 13},
+        {"cluster_id": "b", "listing_count": 3, "arm": "treatment", "baseline_total": 60, "outcome_total": 34},
+        {"cluster_id": "c", "listing_count": 2, "arm": "control", "baseline_total": 40, "outcome_total": 18},
+        {"cluster_id": "d", "listing_count": 4, "arm": "control", "baseline_total": 80, "outcome_total": 37}
+      ]
+    },
+    {
+      "case_id": "ties_degenerate_variance",
+      "alpha": 0.05,
+      "baseline_days": 1,
+      "outcome_days": 1,
+      "allocation_seed": "reference-ties",
+      "clusters": [
+        {"cluster_id": "a", "listing_count": 1, "arm": "treatment", "baseline_total": 5, "outcome_total": 5},
+        {"cluster_id": "b", "listing_count": 1, "arm": "treatment", "baseline_total": 5, "outcome_total": 5},
+        {"cluster_id": "c", "listing_count": 1, "arm": "control", "baseline_total": 5, "outcome_total": 5},
+        {"cluster_id": "d", "listing_count": 1, "arm": "control", "baseline_total": 5, "outcome_total": 5}
+      ]
+    },
+    {
+      "case_id": "eight_cluster_heterogeneous_effects",
+      "alpha": 0.05,
+      "baseline_days": 7,
+      "outcome_days": 14,
+      "allocation_seed": "reference-eight",
+      "clusters": [
+        {"cluster_id": "a", "listing_count": 1, "arm": "treatment", "baseline_total": 7, "outcome_total": 20},
+        {"cluster_id": "b", "listing_count": 2, "arm": "control", "baseline_total": 12, "outcome_total": 25},
+        {"cluster_id": "c", "listing_count": 1, "arm": "treatment", "baseline_total": 5, "outcome_total": 16},
+        {"cluster_id": "d", "listing_count": 3, "arm": "control", "baseline_total": 18, "outcome_total": 31},
+        {"cluster_id": "e", "listing_count": 2, "arm": "treatment", "baseline_total": 9, "outcome_total": 24},
+        {"cluster_id": "f", "listing_count": 1, "arm": "control", "baseline_total": 6, "outcome_total": 13},
+        {"cluster_id": "g", "listing_count": 2, "arm": "treatment", "baseline_total": 14, "outcome_total": 35},
+        {"cluster_id": "h", "listing_count": 2, "arm": "control", "baseline_total": 10, "outcome_total": 18}
+      ]
+    }
+  ]
+}

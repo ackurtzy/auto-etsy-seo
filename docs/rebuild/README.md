@@ -24,5 +24,11 @@ Its ignored data and credentials are not imported into the replacement.
 
 Phase 1 contracts and current quality evidence are in
 `phase1-source-contracts.md`, `measurement-profile-v1.draft.json`, and
-`phase1-data-quality-report.md`. G1 remains open until live receipt access,
-seven day-boundary observations, and H1 reconciliation are complete.
+`phase1-data-quality-report.md`. G1 remains open until seven day-boundary
+observations and H1 reconciliation are complete.
+
+Phase 2 contracts and evidence are in `phase2-method-profile.md`,
+`phase2-eligibility-report.md`, `packages/contracts`, `packages/engine`, and
+`validation/phase2`. A2 is credential-free. G2 does not pass until the owner
+completes H2 and accepts either the qualified randomized route or the explicit
+directional-only route. No randomized or write capability is enabled.

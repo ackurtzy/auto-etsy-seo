@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auto-etsy-seo.local/schemas/evidence-manifest-v1.schema.json",
+  "title": "EvidenceManifest v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "specHash", "methodProfileId", "sourceRevisionHashes", "complete", "maturitySatisfied", "generatedAt", "manifestHash"],
+  "properties": {
+    "schemaVersion": {"const": "evidence-manifest-v1"},
+    "specHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "methodProfileId": {"const": "balanced-cluster-v1"},
+    "sourceRevisionHashes": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-f0-9]{64}$"}},
+    "complete": {"type": "boolean"},
+    "maturitySatisfied": {"type": "boolean"},
+    "generatedAt": {"type": "string", "format": "date-time"},
+    "manifestHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

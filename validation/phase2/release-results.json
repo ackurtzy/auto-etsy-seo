@@ -1,0 +1,87 @@
+{
+  "schema_version": "phase2-release-validation-v1",
+  "method_profile": {
+    "schemaVersion": "method-profile-v1",
+    "profileId": "balanced-cluster-v1",
+    "minimumClusters": 8,
+    "maximumBaselineConcentration": 0.2,
+    "enumerationLimit": 200000,
+    "monteCarloSamples": 99999,
+    "intervalMinimumClusters": 8,
+    "intervalMinimumBaselineOutcomePerCluster": 5
+  },
+  "resolution_table": [
+    {"clusters": 6, "assignmentCount": 20, "optimisticMinimumTwoSidedP": 0.1, "attainable": false},
+    {"clusters": 8, "assignmentCount": 70, "optimisticMinimumTwoSidedP": 0.02857142857142857, "attainable": true},
+    {"clusters": 10, "assignmentCount": 252, "optimisticMinimumTwoSidedP": 0.007936507936507936, "attainable": true},
+    {"clusters": 12, "assignmentCount": 924, "optimisticMinimumTwoSidedP": 0.0021645021645021645, "attainable": true},
+    {"clusters": 20, "assignmentCount": 184756, "optimisticMinimumTwoSidedP": 0.00001082508822446903, "attainable": true}
+  ],
+  "exhaustive_sharp_null": [
+    {"clusters": 6, "assignmentCount": 20, "rejectionRate": 0.0, "alpha": 0.05, "passed": true},
+    {"clusters": 8, "assignmentCount": 70, "rejectionRate": 0.02857142857142857, "alpha": 0.05, "passed": true},
+    {"clusters": 10, "assignmentCount": 252, "rejectionRate": 0.03968253968253968, "alpha": 0.05, "passed": true},
+    {"clusters": 12, "assignmentCount": 924, "rejectionRate": 0.045454545454545456, "alpha": 0.05, "passed": true}
+  ],
+  "scenarios": [
+    {
+      "scenarioId": "sharp-null-balanced-eight-v1",
+      "repetitions": 10000,
+      "trueEffectPerListingDay": 0,
+      "nullRejectionRate": 0.0282,
+      "intervalSupported": true,
+      "intervalUndercoverageRate": 0.0282,
+      "powerSuccessRate": null,
+      "powerLower95": null,
+      "diagnosticCeiling": 0.05653834841531101,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "scenarioId": "sharp-null-sparse-unequal-eight-v1",
+      "repetitions": 10000,
+      "trueEffectPerListingDay": 0,
+      "nullRejectionRate": 0,
+      "intervalSupported": false,
+      "intervalUndercoverageRate": null,
+      "powerSuccessRate": null,
+      "powerLower95": null,
+      "diagnosticCeiling": 0.05653834841531101,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "scenarioId": "coverage-heterogeneous-unequal-eight-v1",
+      "repetitions": 10000,
+      "trueEffectPerListingDay": 4.333333333333333,
+      "nullRejectionRate": null,
+      "intervalSupported": true,
+      "intervalUndercoverageRate": 0.0276,
+      "powerSuccessRate": null,
+      "powerLower95": null,
+      "diagnosticCeiling": 0.05653834841531101,
+      "passed": true,
+      "failures": []
+    },
+    {
+      "scenarioId": "power-strong-effect-eight-v1",
+      "repetitions": 2000,
+      "trueEffectPerListingDay": 20,
+      "nullRejectionRate": null,
+      "intervalSupported": true,
+      "intervalUndercoverageRate": 0.028,
+      "powerSuccessRate": 1,
+      "powerLower95": 0.9986490557920816,
+      "diagnosticCeiling": 0.06462019151721345,
+      "passed": true,
+      "failures": []
+    }
+  ],
+  "monte_carlo_benchmark": {
+    "clusters": 24,
+    "simulations": 99999,
+    "elapsedMilliseconds": 2097.46,
+    "pValue": 0.41849
+  },
+  "passed": true
+}

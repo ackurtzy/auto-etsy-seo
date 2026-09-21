@@ -1,0 +1,32 @@
+{
+  "schema_version": "phase2-reference-results-v1",
+  "results": [
+    {
+      "case_id": "unequal_clusters_baseline_conversion",
+      "estimate": 1.2000000000000002,
+      "p_value": 0.3333333333333333,
+      "assignment_count": 6,
+      "interval": {"status": "unavailable_profile"}
+    },
+    {
+      "case_id": "ties_degenerate_variance",
+      "estimate": 0.0,
+      "p_value": 1.0,
+      "assignment_count": 6,
+      "interval": {"status": "unavailable_degenerate_variance"}
+    },
+    {
+      "case_id": "eight_cluster_heterogeneous_effects",
+      "estimate": 0.3061224489795918,
+      "p_value": 0.02857142857142857,
+      "assignment_count": 70,
+      "interval": {
+        "status": "available",
+        "lower": 0.12273987366277214,
+        "upper": 0.4895050242964114,
+        "standardError": 0.05949950913107449,
+        "degreesOfFreedom": 3.1816513761467893
+      }
+    }
+  ]
+}

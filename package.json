@@ -1,0 +1,16 @@
+{
+  "name": "auto-etsy-seo-rebuild",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test:phase2": "node --test packages/engine/test/*.test.ts",
+    "typecheck:phase2": "tsc -p tsconfig.phase2.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "~5.9.3"
+  }
+}

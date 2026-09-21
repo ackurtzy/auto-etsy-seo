@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auto-etsy-seo.local/schemas/method-profile-v1.schema.json",
+  "title": "MethodProfile v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "profileId", "minimumClusters", "maximumBaselineConcentration", "enumerationLimit", "monteCarloSamples", "intervalMinimumClusters", "intervalMinimumBaselineOutcomePerCluster"],
+  "properties": {
+    "schemaVersion": {"const": "method-profile-v1"},
+    "profileId": {"const": "balanced-cluster-v1"},
+    "minimumClusters": {"type": "integer", "minimum": 8},
+    "maximumBaselineConcentration": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+    "enumerationLimit": {"type": "integer", "minimum": 1},
+    "monteCarloSamples": {"type": "integer", "minimum": 99999},
+    "intervalMinimumClusters": {"type": "integer", "minimum": 8},
+    "intervalMinimumBaselineOutcomePerCluster": {"type": "number", "minimum": 0}
+  }
+}

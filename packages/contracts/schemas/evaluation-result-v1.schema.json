@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auto-etsy-seo.local/schemas/evaluation-result-v1.schema.json",
+  "title": "EvaluationResult v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "specHash", "evidenceManifestHash", "methodProfileId", "estimatePerListingDay", "sharpNull", "averageEffectInterval", "disposition", "eligibility"],
+  "properties": {
+    "schemaVersion": {"const": "evaluation-result-v1"},
+    "specHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "evidenceManifestHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "methodProfileId": {"const": "balanced-cluster-v1"},
+    "estimatePerListingDay": {"type": "number"},
+    "sharpNull": {"type": "object"},
+    "averageEffectInterval": {"type": "object"},
+    "disposition": {"enum": ["evidence_of_change", "inconclusive"]},
+    "eligibility": {"type": "object", "additionalProperties": false, "required": ["eligible", "reasons"], "properties": {"eligible": {"type": "boolean"}, "reasons": {"type": "array", "items": {"type": "string"}}}}
+  }
+}
