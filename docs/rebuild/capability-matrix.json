@@ -1,9 +1,9 @@
 {
   "schema_version": "1.0",
-  "status": "phase_0_all_disabled",
+  "status": "phase_1_validation_in_progress",
   "capabilities": [
-    {"capability": "listing_read", "runtime_enabled": false, "next_gate": "G1"},
-    {"capability": "outcome_read", "runtime_enabled": false, "next_gate": "G1"},
+    {"capability": "listing_read", "runtime_enabled": false, "validation_enabled": true, "next_gate": "G1"},
+    {"capability": "outcome_read", "runtime_enabled": false, "validation_enabled": true, "next_gate": "G1"},
     {"capability": "title_write", "runtime_enabled": false, "next_gate": "G3b-title"},
     {"capability": "tags_write", "runtime_enabled": false, "next_gate": "G3b-tags"},
     {"capability": "directional_experiment", "runtime_enabled": false, "next_gate": "G4"},

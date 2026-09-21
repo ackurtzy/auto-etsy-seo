@@ -2,13 +2,13 @@
   "gate_id": "G0",
   "scope": {
     "tenant_id": null,
-    "shop_id": null,
+    "shop_id": "sha256:188ca0815dee4ba344fc87dd5adba24ac8c2a3c49f86a60953164b6bc1142104",
     "capability": "permission_boundary",
     "trust_level": "T0",
     "method_profile": null
   },
-  "status": "not_run",
-  "repository_commit": "7a06662c389f056d012db7fcc0b815769a393034",
+  "status": "passed_with_explicitly_disabled_capabilities",
+  "repository_commit": "36932e0744fd2354b8a33650bebffa4b1ac373a4",
   "deployed_build": null,
   "contract_versions": {"phase0_records": "1.0", "egress_guard": "1.0"},
   "automated_evidence": [
@@ -20,22 +20,31 @@
       "sha256": "71fa6675ebea6a78d62ed897072f9c78fa7b54b70bd49d338e42fff5b243b90e"
     }
   ],
-  "human_evidence": [],
-  "owner_approver": null,
-  "approved_at": null,
+  "human_evidence": [
+    {
+      "test_id": "H0",
+      "result": "passed_with_explicitly_disabled_capabilities",
+      "artifact": "ignored:docs/gates/private/G0.json",
+      "sha256": "9c07c5bbd7ba40313769d91fc178e57209031b6e62fd8434e24d422219a0db76",
+      "expires_at": "2026-10-05T00:02:58.871314Z"
+    }
+  ],
+  "owner_approver": "A Designs owner",
+  "approved_at": "2026-09-21T00:02:58.871314Z",
   "limitations": [
-    "H0 owner review has not run.",
-    "No live reads or writes are authorized."
+    "Authorization is limited to read-only validation of the owner's A Designs shop and ten protected sample listing identifiers.",
+    "Detailed evidence and live reconciliation output are local, ignored, disposable artifacts.",
+    "No customer-identifying fields may be persisted.",
+    "G0 does not enable a production runtime or any write capability."
   ],
   "explicitly_disabled_capabilities": [
-    "all_live_reads",
     "all_etsy_writes",
     "ai_processing",
     "external_shop_onboarding",
     "randomized_experiments",
     "automation"
   ],
-  "canary_permit_reference": null,
+  "canary_permit_reference": "sha256:9c07c5bbd7ba40313769d91fc178e57209031b6e62fd8434e24d422219a0db76",
   "release_enablement_authorized": false,
-  "notes": "Phase 0 starts fail closed. Only owner-reviewed evidence may advance G0."
+  "notes": "H0 permits only the Phase 1 listing and receipt reads verified by the signed ignored record. The scope expires automatically."
 }

@@ -6,18 +6,20 @@ product. The authoritative implementation source is identified by
 
 ## Current state
 
-Only Phase 0 is implemented. It provides a credential-free safety harness,
-permission and retention records, capability defaults, the owner H0 procedure,
-and a hard quarantine around the v1 Etsy/OpenAI clients.
+Phase 0 is complete for the owner's narrowly approved read-only scope. Phase 1
+is in progress: it provides a strict new Etsy read adapter, sanitized disposable
+validation storage, deterministic source-contract tests, and a private
+reconciliation report. The v1 Etsy/OpenAI runtime remains quarantined.
 
-Nothing in this branch authorizes or enables live Etsy reads, Etsy writes, AI
+The only live capability is bounded Phase 1 validation for the owner's shop as
+recorded in the signed, ignored G0 evidence. Nothing enables Etsy writes, AI
 processing, invited shops, randomized experiments, or production deployment.
-H0 remains `not_run` in `docs/gates/G0.json`.
 
 Run the safe gate locally:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 validation/phase0/validate_phase0.py
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s validation -p 'test_*.py' -v
 ```
 
 ## Legacy runtime
@@ -32,10 +34,17 @@ Legacy ignored data and credentials remain local. They are not new-system
 fixtures, do not establish current Etsy state, and must not be committed or
 placed in an unencrypted shared archive.
 
-## Next gate
+## Phase 1 probe
 
-The owner completes `docs/rebuild/owner-h0-checklist.md` against the actual Etsy
-developer application records. Scope-sensitive identifiers and evidence belong
-in the ignored `docs/gates/private/` location; only redacted hashes and status
-belong in tracked gate records. Phase 1 may begin live read-only reconciliation
-only after that gate is passed for an exact scope.
+The live probe reads the active listing catalog and a bounded recent receipt
+window, strips buyer data before persistence, and writes only to ignored local
+evidence. It never refreshes or rewrites credentials; an expired grant is an
+explicit blocker.
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 -m validation.phase1.run_phase1_probe
+```
+
+G1 remains open until the seven-day view diagnostic and H1 owner comparison
+are complete. Current endpoint and field dispositions are in
+`docs/rebuild/phase1-source-contracts.md`.

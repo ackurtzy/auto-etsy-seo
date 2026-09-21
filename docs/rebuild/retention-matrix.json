@@ -1,13 +1,13 @@
 {
   "schema_version": "1.0",
-  "status": "proposed_not_approved",
+  "status": "phase1_local_validation_approved",
   "rule": "These are ceilings, not a claim of permission. Shorter approved limits win.",
   "classes": [
-    {"data_class": "redacted_diagnostics", "proposed_max_days": 7, "live_processing_enabled": false},
-    {"data_class": "operational_logs", "proposed_max_days": 30, "live_processing_enabled": false},
+    {"data_class": "redacted_diagnostics", "proposed_max_days": 7, "live_processing_enabled": true, "scope": "ignored local Phase 1 artifacts only"},
+    {"data_class": "operational_logs", "proposed_max_days": 30, "live_processing_enabled": true, "scope": "redacted Phase 1 execution metadata only"},
     {"data_class": "encrypted_backups", "proposed_max_days": 30, "live_processing_enabled": false},
     {"data_class": "deidentified_experiment_evidence", "proposed_max_days_after_close": 365, "live_processing_enabled": false},
-    {"data_class": "oauth_tokens", "retention": "connection_lifetime_then_delete", "live_processing_enabled": false},
+    {"data_class": "oauth_tokens", "retention": "connection_lifetime_then_delete", "live_processing_enabled": true, "scope": "existing ignored local credential file only"},
     {"data_class": "buyer_identity_address_email_notes_personalization", "retention": "never_store", "live_processing_enabled": false},
     {"data_class": "legacy_local_runtime_data", "retention": "owner_controlled_archive_pending", "live_processing_enabled": false}
   ],

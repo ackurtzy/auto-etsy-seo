@@ -95,18 +95,25 @@ def main() -> int:
         )
 
     permission = load_json(records_dir / "permission-matrix.json")
+    g0 = load_json(ROOT / "docs" / "gates" / "G0.json")
+    h0_passed = str(g0.get("status", "")).startswith("passed")
     require_exact_keys(permission, {"schema_version", "status", "rule", "activities"}, "permission matrix")
     allowed_permission_statuses = {"unresolved", "retired"}
+    if h0_passed:
+        allowed_permission_statuses.update({"approved_for_phase1_validation", "explicitly_disabled"})
     if not permission["activities"]:
         raise AssertionError("permission matrix is empty")
     for cell in permission["activities"]:
         require_exact_keys(cell, {"activity", "status", "enabled", "required_evidence"}, "permission activity")
         if cell["status"] not in allowed_permission_statuses:
-            raise AssertionError(f"permission activity has invalid pre-H0 status: {cell['status']}")
+            raise AssertionError(f"permission activity has invalid status for the current H0 state: {cell['status']}")
         if not cell["required_evidence"]:
             raise AssertionError("permission activity lacks required evidence")
-    if any(cell["enabled"] for cell in permission["activities"]):
+    enabled_activities = {cell["activity"] for cell in permission["activities"] if cell["enabled"]}
+    if not h0_passed and enabled_activities:
         raise AssertionError("live processing must remain disabled before H0")
+    if enabled_activities.difference({"own_shop_listing_reads", "own_shop_outcome_reads"}):
+        raise AssertionError("G0 may enable only own-shop Phase 1 read validation")
 
     policy = load_json(records_dir / "initial-policy.json")
     required_false_flags = (
@@ -121,8 +128,15 @@ def main() -> int:
 
     retention = load_json(records_dir / "retention-matrix.json")
     require_exact_keys(retention, {"schema_version", "status", "rule", "classes", "deletion_target_hours", "backup_restore_rule"}, "retention matrix")
-    if not retention["classes"] or any(item.get("live_processing_enabled") is not False for item in retention["classes"]):
+    if not retention["classes"]:
+        raise AssertionError("retention matrix is empty")
+    enabled_retention = {
+        item["data_class"] for item in retention["classes"] if item.get("live_processing_enabled") is True
+    }
+    if not h0_passed and enabled_retention:
         raise AssertionError("all retention classes must explicitly disable live processing before H0")
+    if enabled_retention.difference({"redacted_diagnostics", "operational_logs", "oauth_tokens"}):
+        raise AssertionError("G0 enabled an unsupported retention class")
 
     capability = load_json(records_dir / "capability-matrix.json")
     if not capability["capabilities"]:
@@ -143,9 +157,10 @@ def main() -> int:
 
     scanned_files = 0
     scan_paths: list[Path] = []
+    private_evidence_root = (ROOT / "docs" / "gates" / "private").resolve()
     for relative_root in DOCUMENT_SCAN_ROOTS:
         for path in (ROOT / relative_root).rglob("*"):
-            if path.is_file():
+            if path.is_file() and private_evidence_root not in path.resolve().parents:
                 scan_paths.append(path)
     inventory = load_json(records_dir / "sample-inventory.json")
     for fixture in inventory["synthetic_samples"]:
@@ -169,7 +184,6 @@ def main() -> int:
     )
     if a0["status"] != "passed" or a0["failures"] or a0["external_requests"] != 0:
         raise AssertionError("checked-in A0 result does not describe a clean credential-free pass")
-    g0 = load_json(ROOT / "docs" / "gates" / "G0.json")
     if g0.get("repository_commit") != a0["implementation_revision"]:
         raise AssertionError("G0 and A0 do not identify the same implementation revision")
     if not re.fullmatch(r"[a-f0-9]{40}", a0["implementation_revision"]):
@@ -192,7 +206,9 @@ def main() -> int:
     ).stdout.splitlines()
     evidence_only_paths = {
         "docs/gates/G0.json",
+        "docs/gates/G1.json",
         "validation/phase0/a0-results.json",
+        "validation/phase1/a1-results.json",
     }
     unexpected_changes = set(changed_since_evidence).difference(evidence_only_paths)
     if unexpected_changes:
@@ -249,9 +265,8 @@ def main() -> int:
         "fixture_files_scanned": scanned_files,
         "artifacts": artifact_evidence,
         "limitations": [
-            "H0 owner review has not run.",
             "No Etsy, model-provider, Clerk, Resend, or Cloudflare integration was contacted.",
-            "This does not enable live reads or writes.",
+            "This validator proves the local Phase 0 boundary only; any Phase 1 reads require separate signed G0 evidence.",
         ],
     }
     print(json.dumps(result, indent=2))

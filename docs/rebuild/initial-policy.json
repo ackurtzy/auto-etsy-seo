@@ -1,23 +1,21 @@
 {
   "schema_version": "1.0",
-  "status": "requires_owner_review",
+  "status": "phase1_read_only_validation_approved",
+  "validation_egress_enabled": true,
   "production_egress_enabled": false,
   "production_mutations_enabled": false,
   "external_shop_onboarding_enabled": false,
   "ai_generation_enabled": false,
   "legacy_runtime_enabled": false,
   "budgets": {
-    "etsy_application_reads_per_day": null,
+    "etsy_application_reads_per_day": 100,
+    "etsy_application_reads_per_probe": 25,
     "etsy_application_writes_per_day": 0,
     "ai_usd_per_month": 0,
     "concurrent_experiments_per_shop": 0,
     "unscheduled_support_minutes_per_shop_week": 15
   },
   "required_owner_inputs": [
-    "approved Etsy use and access scope",
-    "read-only sample shop and listing set",
-    "vendor and retention approval",
-    "API and AI budgets",
     "support contact",
     "future low-risk canary listing"
   ]

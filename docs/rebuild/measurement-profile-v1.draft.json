@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0",
+  "profile_id": "etsy-own-shop-phase1-draft-1",
+  "status": "draft_pending_G1",
+  "captured_at": "2026-09-21T00:00:00Z",
+  "source": "Etsy Open API v3",
+  "identity_contracts": {
+    "listing": ["listing_id"],
+    "transaction_line": ["transaction_id", "listing_id"],
+    "receipt": ["receipt_id"],
+    "observation_revision": ["entity_kind", "entity_id", "source_version", "payload_sha256"]
+  },
+  "metrics": [
+    {
+      "metric": "listing_state_title_tags",
+      "status": "pending_H1",
+      "coverage_rule": "complete stable-count pagination or exact sample read",
+      "maturity_rule": "current-state observation only"
+    },
+    {
+      "metric": "transaction_units",
+      "status": "blocked_expired_or_revoked_grant",
+      "coverage_rule": "complete receipt pagination plus unique transaction identity",
+      "maturity_rule": "pending payment and correction timing validation"
+    },
+    {
+      "metric": "transaction_item_money",
+      "status": "blocked_expired_or_revoked_grant",
+      "coverage_rule": "valid amount divisor currency and complete receipt pagination",
+      "maturity_rule": "pending H1 conservation check; shipping and tax excluded"
+    },
+    {
+      "metric": "listing_views",
+      "status": "disabled_semantics_unresolved",
+      "coverage_rule": "seven consecutive day-boundary observations with no source gaps",
+      "maturity_rule": "source period counter epoch latency and zero semantics must be established"
+    },
+    {
+      "metric": "refund_adjusted_revenue",
+      "status": "disabled_without_line_allocation",
+      "coverage_rule": "every adjustment must map to a transaction line",
+      "maturity_rule": "late corrections append a new fact revision"
+    }
+  ],
+  "privacy": {
+    "buyer_identity_address_email_notes_personalization": "never_persist",
+    "raw_provider_payload": "memory_only_until_whitelist_sanitized",
+    "detailed_report": "ignored_local_max_7_days"
+  }
+}
