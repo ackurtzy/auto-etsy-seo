@@ -4,7 +4,7 @@
   "status": "partial_pass_live_receipts_observed",
   "method_version": "phase1-a1-v1",
   "measurement_profile": "etsy-own-shop-phase1-draft-1",
-  "repository_commit": "47ab4f58b930c9daeb89fcbc1a93a140b9dfa10e",
+  "repository_commit": "7affa6cc8c8b2ad7b1eccbec1bae8df9512d61b1",
   "executed_at": "2026-09-21T00:51:06Z",
   "automated_tests": {
     "result": "passed",
