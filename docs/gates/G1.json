@@ -2,18 +2,20 @@
   "gate_id": "G1",
   "status": "in_progress",
   "scope": "owner_shop_read_only_measurement_validation",
-  "repository_commit": "2377b969e90944c9733c24f68ab30cbb09726d64",
+  "repository_commit": "a1c6b52ba5511899c8a1b7ac6b224c6beebe6c23",
   "contract_versions": {
     "measurement_profile": "draft-1",
     "sanitizer": "1.0",
-    "canonical_store": "1.0"
+    "canonical_store": "1.0",
+    "no_redirect_transport": "1.0",
+    "atomic_request_ledger": "1.0"
   },
   "automated_evidence": [
     {
       "test_id": "A1",
-      "result": "partial_pass_live_receipts_observed",
+      "result": "partial_pass_historical_live_evidence_requires_revalidation",
       "artifact": "validation/phase1/a1-results.json",
-      "sha256": "2c5652a74b3457c3e82422b075d7e8f1e9e863293ca95932721b9eab0d134270"
+      "sha256": "02024b1f4998a3214bd945e3a642cec4171ed257edd99d572bdb8c44461d565f"
     }
   ],
   "human_evidence": [],
@@ -26,6 +28,7 @@
   },
   "limitations": [
     "No metric has passed G1 yet.",
+    "The retained live observation predates the hardened transport and requires separately authorized revalidation before it can support a gate decision.",
     "No causal or experimental claim is enabled.",
     "Title and tag write serialization remains a G3 draft.",
     "Detailed identifiers and reconciliation evidence remain in ignored local files."

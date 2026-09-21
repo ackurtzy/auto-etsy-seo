@@ -1,17 +1,18 @@
 {
   "schema_version": "1.0",
   "gate": "A1",
-  "status": "partial_pass_live_receipts_observed",
+  "status": "partial_pass_historical_live_evidence_requires_revalidation",
   "method_version": "phase1-a1-v1",
   "measurement_profile": "etsy-own-shop-phase1-draft-1",
-  "repository_commit": "2377b969e90944c9733c24f68ab30cbb09726d64",
+  "repository_commit": "a1c6b52ba5511899c8a1b7ac6b224c6beebe6c23",
   "executed_at": "2026-09-21T00:51:06Z",
   "automated_tests": {
     "result": "passed",
-    "count": 23,
+    "count": 32,
     "external_requests": 0
   },
   "live_observation": {
+    "observed_with_revision": "2377b969e90944c9733c24f68ab30cbb09726d64",
     "result": "complete_for_configured_30_day_window",
     "recorded_run_request_count": 4,
     "phase1_daily_ledger_used": 15,
@@ -42,7 +43,9 @@
     "corrections append revisions and move only the canonical pointer",
     "the retained live measurement observation uses only GET requests within signed scope",
     "the replacement OAuth grant is limited to transactions_r and credential material remains local and ignored",
-    "the configured 30-day receipt window completed in one paginated request"
+    "the configured 30-day receipt window completed in one paginated request",
+    "the hardened transport rejects every redirect without following it",
+    "the persistent daily request ledger fails closed and replaces state atomically"
   ],
   "failures": [
     "four refunded receipts cannot support item-level money because the source does not allocate refunds to transaction lines",
@@ -51,6 +54,7 @@
   ],
   "limitations": [
     "No metric has passed G1.",
+    "The retained live observation predates the hardened no-redirect transport and is historical evidence only until a separately authorized revalidation.",
     "The 30-day receipt read validates source coverage and item-level allocation behavior but has not passed owner comparison.",
     "The views field remains disabled as an experiment outcome.",
     "Detailed shop and listing identifiers remain only in ignored evidence."

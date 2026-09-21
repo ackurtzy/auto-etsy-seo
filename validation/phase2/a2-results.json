@@ -3,12 +3,12 @@
   "gate": "A2",
   "status": "passed_automated_awaiting_H2",
   "method_version": "balanced-cluster-v1",
-  "repository_commit": "2377b969e90944c9733c24f68ab30cbb09726d64",
-  "executed_at": "2026-09-21T01:20:00Z",
+  "repository_commit": "a1c6b52ba5511899c8a1b7ac6b224c6beebe6c23",
+  "executed_at": "2026-09-21T01:39:50Z",
   "external_requests": 0,
   "automated_tests": {
-    "typescript": 20,
-    "phase1_regression": 23,
+    "typescript": 22,
+    "phase1_regression": 32,
     "reference_cases": 3,
     "release_simulation_scenarios": 4
   },
@@ -29,7 +29,9 @@
     "zero baselines dominant clusters and stricter alpha remain ineligible",
     "sparse pre-treatment outcomes withhold the undercovered average-effect interval",
     "the production Monte Carlo path is deterministic and stays within the offline 10-second execution budget",
-    "directional studies emit no p-value causal confidence or automatic decision"
+    "directional studies emit no p-value causal confidence or automatic decision",
+    "runtime JSON Schema and semantic validation reject malformed nested results and impossible assignments",
+    "declared A2 artifact hashes are enforced against safe repository-relative regular files"
   ],
   "failures": [],
   "shop_feasibility": {
