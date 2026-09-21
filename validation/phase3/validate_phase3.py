@@ -88,8 +88,7 @@ def validate_schema() -> None:
 
 def validate_config() -> None:
     raw = (ROOT / "apps" / "worker" / "wrangler.jsonc").read_text(encoding="utf-8")
-    stripped = re.sub(r"//.*$", "", raw, flags=re.MULTILINE)
-    config = json.loads(stripped)
+    config = json.loads(raw)
     if config.get("workers_dev") is not False:
         raise AssertionError("Worker must not publish to workers.dev")
     variables = config.get("vars", {})
