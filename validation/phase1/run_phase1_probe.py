@@ -10,12 +10,11 @@ import json
 from pathlib import Path
 from typing import Any
 
-import requests
-
 from validation.phase1.etsy_readonly import (
     CredentialStore,
     DailyRequestLedger,
     EtsyReadOnlyClient,
+    NoRedirectRequestsTransport,
     Phase1Authorization,
     RequestBudget,
 )
@@ -35,7 +34,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     authorization = Phase1Authorization.load(
         args.authorization, args.verification_key, args.tracked_gate
     )
-    session = requests.Session()
     budget = RequestBudget(
         max_requests=args.max_requests,
         daily_ledger=DailyRequestLedger(args.daily_ledger, daily_limit=100),
@@ -43,7 +41,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     client = EtsyReadOnlyClient(
         authorization=authorization,
         credentials=CredentialStore(args.credentials),
-        transport=session,
+        transport=NoRedirectRequestsTransport(),
         budget=budget,
     )
     listing_pages = client.fetch_active_listing_pages(limit=100)

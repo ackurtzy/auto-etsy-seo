@@ -3,10 +3,10 @@ import { readFileSync } from "node:fs";
 import {
   evaluateRandomizedExperiment,
   createEvidenceManifest,
-  freezeExperimentSpec,
   PRODUCTION_METHOD_PROFILE,
   type ExperimentSpecInput,
 } from "../../packages/engine/src/index.ts";
+import { freezeExperimentSpecWithAssignment } from "../../packages/engine/src/spec.ts";
 
 interface ReferenceCase {
   case_id: string;
@@ -56,7 +56,7 @@ const results = fixture.cases.map((item) => {
     evidenceRequirements: ["complete"],
   };
   const assignment = Object.fromEntries(item.clusters.map((cluster) => [cluster.cluster_id, cluster.arm]));
-  const frozen = freezeExperimentSpec(input, assignment);
+  const frozen = freezeExperimentSpecWithAssignment(input, assignment);
   const evidence = createEvidenceManifest({
     specHash: frozen.specHash,
     methodProfileId: PRODUCTION_METHOD_PROFILE.profileId,

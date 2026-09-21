@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { parseEvaluationResult, parseFrozenExperimentSpec } from "../../contracts/src/index.ts";
+
 import {
   attainableResolution,
   createEvidenceManifest,
@@ -8,10 +10,12 @@ import {
   evaluateRandomizedExperiment,
   freezeExperimentSpec,
   PRODUCTION_METHOD_PROFILE,
+  sha256,
   studentTCritical,
   type ClusterObservation,
   type ExperimentSpecInput,
 } from "../src/index.ts";
+import { freezeExperimentSpecWithAssignment } from "../src/spec.ts";
 
 const baseSpec: ExperimentSpecInput = {
   schemaVersion: "experiment-spec-v1",
@@ -82,7 +86,7 @@ test("freezing is deterministic and binds exact proposals and assignment", () =>
 });
 
 test("listing-weighted estimator handles unequal cluster sizes", () => {
-  const frozen = freezeExperimentSpec(baseSpec, { a: "treatment", b: "treatment", c: "control", d: "control" });
+  const frozen = freezeExperimentSpecWithAssignment(baseSpec, { a: "treatment", b: "treatment", c: "control", d: "control" });
   const observations: ClusterObservation[] = [
     { clusterId: "a", baselineTotal: 10, outcomeTotal: 12, baselineComplete: true, outcomeComplete: true },
     { clusterId: "b", baselineTotal: 30, outcomeTotal: 33, baselineComplete: true, outcomeComplete: true },
@@ -96,7 +100,7 @@ test("listing-weighted estimator handles unequal cluster sizes", () => {
 });
 
 test("ties are included in the exact sharp-null p-value", () => {
-  const frozen = freezeExperimentSpec(baseSpec, { a: "treatment", b: "treatment", c: "control", d: "control" });
+  const frozen = freezeExperimentSpecWithAssignment(baseSpec, { a: "treatment", b: "treatment", c: "control", d: "control" });
   const observations = ["a", "b", "c", "d"].map((clusterId) => ({
     clusterId,
     baselineTotal: 5,
@@ -147,7 +151,49 @@ test("an altered frozen specification is rejected", () => {
     baselineComplete: true,
     outcomeComplete: true,
   }));
-  assert.throws(() => evaluateRandomizedExperiment(altered, observations, PRODUCTION_METHOD_PROFILE, evidenceFor(frozen.specHash)), /spec hash mismatch/);
+  assert.throws(() => evaluateRandomizedExperiment(altered, observations, PRODUCTION_METHOD_PROFILE, evidenceFor(frozen.specHash)), /HASH_MISMATCH/);
+});
+
+test("a self-hashed impossible assignment is rejected before inference", () => {
+  const valid = freezeExperimentSpec({
+    ...baseSpec,
+    clusterRoster: Array.from({ length: 8 }, (_, index) => ({ clusterId: `c${index}`, listingIds: [`l${index}`] })),
+    candidateHashes: Object.fromEntries(Array.from({ length: 8 }, (_, index) => [`c${index}`, index.toString(16).padStart(64, "0")])),
+  });
+  const { specHash: _ignored, ...withoutHash } = valid;
+  const forgedWithoutHash = {
+    ...withoutHash,
+    assignment: Object.fromEntries(Object.keys(valid.assignment).map((clusterId) => [clusterId, "treatment" as const])),
+  };
+  const forged = { ...forgedWithoutHash, specHash: sha256(forgedWithoutHash) };
+  const observations = forged.clusterRoster.map((cluster, index) => ({
+    clusterId: cluster.clusterId,
+    baselineTotal: 10,
+    outcomeTotal: 10 + index,
+    baselineComplete: true,
+    outcomeComplete: true,
+  }));
+  assert.throws(
+    () => evaluateRandomizedExperiment(forged, observations, PRODUCTION_METHOD_PROFILE, evidenceFor(forged.specHash)),
+    /assignment/i,
+  );
+
+  const forgeAssignment = (assignment: Record<string, unknown>): unknown => {
+    const { specHash: _hash, ...content } = valid;
+    const forgedContent = { ...content, assignment };
+    return { ...forgedContent, specHash: sha256(forgedContent) };
+  };
+  const missing = { ...valid.assignment } as Record<string, unknown>;
+  delete missing.c0;
+  assert.throws(() => parseFrozenExperimentSpec(forgeAssignment(missing)), /ASSIGNMENT_KEYS_MISMATCH/);
+  assert.throws(
+    () => parseFrozenExperimentSpec(forgeAssignment({ ...valid.assignment, c0: "candidate" })),
+    /SCHEMA_INVALID/,
+  );
+  assert.throws(
+    () => parseFrozenExperimentSpec(forgeAssignment({ ...valid.assignment, unexpected: "control" })),
+    /ASSIGNMENT_KEYS_MISMATCH/,
+  );
 });
 
 test("supported eight-cluster profile reports an average-effect interval", () => {
@@ -239,7 +285,7 @@ test("an unavailable method profile cannot evaluate a frozen specification", () 
   }));
   assert.throws(
     () => evaluateRandomizedExperiment(frozen, observations, { ...PRODUCTION_METHOD_PROFILE, profileId: "missing" as never }, evidenceFor(frozen.specHash)),
-    /method profile mismatch/,
+    /MethodProfile.*SCHEMA_INVALID/,
   );
 });
 
@@ -257,13 +303,13 @@ test("Monte Carlo inference is reproducible and cannot return zero", () => {
     baselineComplete: true,
     outcomeComplete: true,
   }));
-  const testProfile = { ...PRODUCTION_METHOD_PROFILE, monteCarloSamples: 999 };
+  const testProfile = PRODUCTION_METHOD_PROFILE;
   const evidence = evidenceFor(spec.specHash);
   const first = evaluateRandomizedExperiment(spec, observations, testProfile, evidence);
   const second = evaluateRandomizedExperiment(spec, observations, testProfile, evidence);
   assert.equal(first.sharpNull.method, "monte_carlo");
   assert.equal(first.sharpNull.pValue, second.sharpNull.pValue);
-  assert.ok(first.sharpNull.pValue >= 1 / 1000);
+  assert.ok(first.sharpNull.pValue >= 1 / 100_000);
 });
 
 test("evidence manifests are canonical and material changes invalidate them", () => {
@@ -282,5 +328,27 @@ test("evidence manifests are canonical and material changes invalidate them", ()
     baselineComplete: true,
     outcomeComplete: true,
   }));
-  assert.throws(() => evaluateRandomizedExperiment(frozen, observations, PRODUCTION_METHOD_PROFILE, altered), /evidence manifest hash mismatch/);
+  assert.throws(() => evaluateRandomizedExperiment(frozen, observations, PRODUCTION_METHOD_PROFILE, altered), /HASH_MISMATCH/);
+});
+
+test("runtime contract parsers accept serialized valid values and reject malformed nested results", () => {
+  const frozen = freezeExperimentSpec(baseSpec);
+  assert.deepEqual(parseFrozenExperimentSpec(JSON.parse(JSON.stringify(frozen))), frozen);
+  const observations = ["a", "b", "c", "d"].map((clusterId) => ({
+    clusterId,
+    baselineTotal: 5,
+    outcomeTotal: 6,
+    baselineComplete: true,
+    outcomeComplete: true,
+  }));
+  const result = evaluateRandomizedExperiment(frozen, observations, PRODUCTION_METHOD_PROFILE, evidenceFor(frozen.specHash));
+  assert.deepEqual(parseEvaluationResult(JSON.parse(JSON.stringify(result))), result);
+  assert.throws(
+    () => parseEvaluationResult({ ...result, sharpNull: {} }),
+    /EvaluationResult.*SCHEMA_INVALID/,
+  );
+  assert.throws(
+    () => parseEvaluationResult({ ...result, averageEffectInterval: { status: "available" } }),
+    /EvaluationResult.*SCHEMA_INVALID/,
+  );
 });

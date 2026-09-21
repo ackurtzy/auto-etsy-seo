@@ -8,7 +8,10 @@ import math
 from pathlib import Path
 import subprocess
 
-from reference import reference_results
+try:
+    from validation.phase2.reference import reference_results
+except ModuleNotFoundError:  # Direct script execution places this directory on sys.path.
+    from reference import reference_results
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -19,6 +22,12 @@ SCHEMA_NAMES = (
     "evidence-manifest-v1.schema.json",
     "evaluation-result-v1.schema.json",
 )
+EXPECTED_A2_ARTIFACTS = {
+    "validation/phase2/reference-results.json",
+    "validation/phase2/release-results.json",
+    "validation/phase2/fixtures/reference-cases.json",
+    "validation/phase2/fixtures/simulation-scenarios.json",
+}
 
 
 def run(command: list[str]) -> str:
@@ -51,6 +60,40 @@ def compare_numbers(left, right, path: str = "root") -> None:
         return
     if left != right:
         raise AssertionError(f"{path}: {left!r} != {right!r}")
+
+
+def validate_artifact_manifest(a2: dict, *, root: Path = ROOT) -> None:
+    artifacts = a2.get("artifacts")
+    if not isinstance(artifacts, list):
+        raise AssertionError("A2 artifacts must be a list")
+    seen: set[str] = set()
+    for item in artifacts:
+        if not isinstance(item, dict) or set(item) != {"artifact", "sha256"}:
+            raise AssertionError("A2 artifact entry has an unsupported shape")
+        relative = item["artifact"]
+        digest = item["sha256"]
+        if not isinstance(relative, str) or relative.startswith("/") or "\\" in relative or ".." in Path(relative).parts:
+            raise AssertionError("A2 artifact path must be a safe repository-relative path")
+        if relative in seen:
+            raise AssertionError(f"A2 artifact is duplicated: {relative}")
+        seen.add(relative)
+        if relative not in EXPECTED_A2_ARTIFACTS:
+            raise AssertionError(f"A2 artifact is not approved: {relative}")
+        if not isinstance(digest, str) or len(digest) != 64 or any(character not in "0123456789abcdef" for character in digest):
+            raise AssertionError(f"A2 artifact hash is malformed: {relative}")
+        path = root / relative
+        if path.is_symlink() or not path.is_file():
+            raise AssertionError(f"A2 artifact must be a regular file: {relative}")
+        current = root
+        for part in Path(relative).parts[:-1]:
+            current /= part
+            if current.is_symlink():
+                raise AssertionError(f"A2 artifact path crosses a symlink: {relative}")
+        if hashlib.sha256(path.read_bytes()).hexdigest() != digest:
+            raise AssertionError(f"A2 artifact hash mismatch: {relative}")
+    if seen != EXPECTED_A2_ARTIFACTS:
+        missing = sorted(EXPECTED_A2_ARTIFACTS.difference(seen))
+        raise AssertionError("A2 artifact manifest is incomplete: " + ", ".join(missing))
 
 
 def main() -> int:
@@ -87,6 +130,7 @@ def main() -> int:
 
     a2_path = ROOT / "validation" / "phase2" / "a2-results.json"
     a2 = json.loads(a2_path.read_text(encoding="utf-8"))
+    validate_artifact_manifest(a2)
     g2 = json.loads((ROOT / "docs" / "gates" / "G2.json").read_text(encoding="utf-8"))
     if a2["status"] != "passed_automated_awaiting_H2" or a2["external_requests"] != 0:
         raise AssertionError("A2 must remain credential-free and awaiting H2")
@@ -123,7 +167,7 @@ def main() -> int:
         "gate": "A2",
         "status": "passed",
         "external_requests": 0,
-        "typescript_tests": 20,
+        "typescript_tests": 22,
         "reference_cases": len(stored_reference["results"]),
         "simulation_scenarios": len(stored_release["scenarios"]),
         "schema_hashes": schema_hashes,

@@ -14,11 +14,12 @@ import {
   runFixedPopulationScenario,
   type FixedPopulationScenario,
 } from "../../packages/engine/src/simulation.ts";
+import { parseSimulationScenario } from "../../packages/contracts/src/index.ts";
 
 const scenarioFixture = JSON.parse(
   readFileSync(new URL("./fixtures/simulation-scenarios.json", import.meta.url), "utf8"),
-) as { scenarios: Array<FixedPopulationScenario & { schemaVersion: "simulation-scenario-v1" }> };
-const scenarios = scenarioFixture.scenarios;
+) as { scenarios: unknown[] };
+const scenarios: FixedPopulationScenario[] = scenarioFixture.scenarios.map(parseSimulationScenario);
 
 function benchmarkMonteCarlo(): { clusters: number; simulations: number; elapsedMilliseconds: number; pValue: number } {
   const clusterRoster = Array.from({ length: 24 }, (_, index) => ({ clusterId: `c${index}`, listingIds: [`l${index}`] }));

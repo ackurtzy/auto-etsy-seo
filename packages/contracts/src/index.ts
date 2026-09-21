@@ -109,6 +109,16 @@ export interface EvaluationResult {
   eligibility: { eligible: boolean; reasons: string[] };
 }
 
+export { canonicalJson, sha256 } from "./canonical.ts";
+export {
+  ContractValidationError,
+  parseEvaluationResult,
+  parseEvidenceManifest,
+  parseFrozenExperimentSpec,
+  parseMethodProfile,
+  parseSimulationScenario,
+} from "./runtime.ts";
+
 function requireIso(value: string, label: string): void {
   if (!value || Number.isNaN(Date.parse(value))) throw new Error(`${label} must be an ISO timestamp`);
 }

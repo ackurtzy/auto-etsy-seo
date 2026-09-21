@@ -14,8 +14,12 @@ token is not authorization.
 Run:
 
 ```bash
+node --version  # requires Node 24+
+npm ci --ignore-scripts
 python3 validation/phase0/validate_phase0.py
 python3 -m unittest discover -s validation -p 'test_*.py' -v
+python3 validation/phase1/validate_phase1.py
+python3 validation/phase2/validate_phase2.py
 ```
 
 The legacy runtime is preserved by Git tag `legacy-v1-2026-09-20` and is hard
@@ -29,6 +33,8 @@ observations and H1 reconciliation are complete.
 
 Phase 2 contracts and evidence are in `phase2-method-profile.md`,
 `phase2-eligibility-report.md`, `packages/contracts`, `packages/engine`, and
-`validation/phase2`. A2 is credential-free. G2 does not pass until the owner
+`validation/phase2`. The versioned JSON Schemas are executable runtime shape
+contracts, with semantic validation for cross-field and hash invariants. A2 is
+credential-free. G2 does not pass until the owner
 completes H2 and accepts either the qualified randomized route or the explicit
 directional-only route. No randomized or write capability is enabled.

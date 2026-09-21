@@ -1,11 +1,11 @@
 import {
   evaluateRandomizedExperiment,
   createEvidenceManifest,
-  freezeExperimentSpec,
   PRODUCTION_METHOD_PROFILE,
   sha256,
   type ExperimentSpecInput,
 } from "./index.ts";
+import { freezeExperimentSpecWithAssignment } from "./spec.ts";
 
 export interface FixedPopulationScenario {
   scenarioId: string;
@@ -171,7 +171,7 @@ export function runFixedPopulationScenario(scenario: FixedPopulationScenario): S
     const assignment = Object.fromEntries(
       Array.from({ length: count }, (_, index) => [`c${index}`, treated.has(index) ? "treatment" as const : "control" as const]),
     );
-    const spec = freezeExperimentSpec(input, assignment);
+    const spec = freezeExperimentSpecWithAssignment(input, assignment);
     const evidence = createEvidenceManifest({
       specHash: spec.specHash,
       methodProfileId: PRODUCTION_METHOD_PROFILE.profileId,

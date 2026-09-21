@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import fcntl
 import hashlib
 import hmac
@@ -11,7 +11,10 @@ import json
 import os
 from pathlib import Path
 import re
+import tempfile
 from typing import Any, Mapping, Protocol
+
+import requests
 
 from validation.phase1.measurement import classify_http_failure, sanitize_listing, sanitize_receipt
 
@@ -38,6 +41,29 @@ class HttpTransport(Protocol):
     ) -> HttpResponse: ...
 
 
+class NoRedirectRequestsTransport:
+    """Production HTTP adapter that never follows an unapproved redirect hop."""
+
+    def __init__(self, *, session: Any | None = None) -> None:
+        self._session = session if session is not None else requests.Session()
+
+    def get(
+        self,
+        url: str,
+        *,
+        headers: dict[str, str],
+        params: dict[str, Any],
+        timeout: int,
+    ) -> HttpResponse:
+        return self._session.get(
+            url,
+            headers=headers,
+            params=params,
+            timeout=timeout,
+            allow_redirects=False,
+        )
+
+
 @dataclass
 class RequestBudget:
     max_requests: int = 25
@@ -59,23 +85,61 @@ class DailyRequestLedger:
 
     def consume(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a+", encoding="utf-8") as handle:
-            os.chmod(self.path, 0o600)
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-            handle.seek(0)
+        lock_path = self.path.with_name(f".{self.path.name}.lock")
+        with lock_path.open("a+", encoding="utf-8") as lock_handle:
+            os.chmod(lock_path, 0o600)
+            fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX)
+            if self.path.is_symlink():
+                raise RuntimeError("Phase 1 daily Etsy request ledger is malformed")
             try:
-                record = json.load(handle)
-            except (json.JSONDecodeError, ValueError):
+                raw = self.path.read_bytes() if self.path.exists() else b""
+            except OSError as exc:
+                raise RuntimeError("Phase 1 daily Etsy request ledger is unavailable") from exc
+            if raw:
+                try:
+                    record = json.loads(raw)
+                    if not isinstance(record, dict) or set(record) != {"utc_day", "used"}:
+                        raise ValueError("unsupported ledger shape")
+                    ledger_day = date.fromisoformat(record["utc_day"])
+                    used_value = record["used"]
+                    if isinstance(used_value, bool) or not isinstance(used_value, int) or used_value < 0:
+                        raise ValueError("invalid ledger count")
+                except (json.JSONDecodeError, TypeError, ValueError) as exc:
+                    raise RuntimeError("Phase 1 daily Etsy request ledger is malformed") from exc
+            else:
                 record = {}
+                ledger_day = None
+                used_value = 0
             utc_day = datetime.now(timezone.utc).date().isoformat()
-            used = int(record.get("used", 0)) if record.get("utc_day") == utc_day else 0
+            used = used_value if ledger_day is not None and ledger_day.isoformat() == utc_day else 0
             if used >= self.daily_limit:
                 raise RuntimeError("Phase 1 daily Etsy request budget exhausted")
-            handle.seek(0)
-            handle.truncate()
-            json.dump({"utc_day": utc_day, "used": used + 1}, handle, sort_keys=True)
-            handle.flush()
-            os.fsync(handle.fileno())
+            temporary_path: Path | None = None
+            try:
+                descriptor, temporary_name = tempfile.mkstemp(
+                    prefix=f".{self.path.name}.", suffix=".tmp", dir=self.path.parent
+                )
+                temporary_path = Path(temporary_name)
+                os.fchmod(descriptor, 0o600)
+                with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+                    json.dump({"utc_day": utc_day, "used": used + 1}, handle, sort_keys=True)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary_path, self.path)
+                temporary_path = None
+                directory_fd = os.open(self.path.parent, os.O_RDONLY)
+                try:
+                    os.fsync(directory_fd)
+                finally:
+                    os.close(directory_fd)
+            except OSError as exc:
+                raise RuntimeError("Phase 1 daily Etsy request ledger could not persist safely") from exc
+            finally:
+                if temporary_path is not None:
+                    try:
+                        temporary_path.unlink()
+                    except FileNotFoundError:
+                        pass
 
 
 @dataclass(frozen=True)
@@ -204,6 +268,8 @@ class EtsyReadOnlyClient:
             params=params,
             timeout=self.timeout,
         )
+        if 300 <= response.status_code < 400:
+            raise RuntimeError("Etsy read failed: redirect_disallowed")
         if response.status_code != 200:
             failure = classify_http_failure(response.status_code)
             retry_after = response.headers.get("retry-after") if response.status_code == 429 else None

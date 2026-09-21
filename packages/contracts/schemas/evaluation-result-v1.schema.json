@@ -11,9 +11,59 @@
     "evidenceManifestHash": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
     "methodProfileId": {"const": "balanced-cluster-v1"},
     "estimatePerListingDay": {"type": "number"},
-    "sharpNull": {"type": "object"},
-    "averageEffectInterval": {"type": "object"},
+    "sharpNull": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "pValue", "assignmentCount", "simulations", "seed", "monteCarloStandardError"],
+          "properties": {
+            "method": {"const": "exact_enumeration"},
+            "pValue": {"type": "number", "minimum": 0, "maximum": 1},
+            "assignmentCount": {"type": "integer", "minimum": 1},
+            "simulations": {"type": "null"},
+            "seed": {"type": "null"},
+            "monteCarloStandardError": {"type": "null"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["method", "pValue", "assignmentCount", "simulations", "seed", "monteCarloStandardError"],
+          "properties": {
+            "method": {"const": "monte_carlo"},
+            "pValue": {"type": "number", "exclusiveMinimum": 0, "maximum": 1},
+            "assignmentCount": {"type": "null"},
+            "simulations": {"type": "integer", "minimum": 1},
+            "seed": {"type": "string", "minLength": 1},
+            "monteCarloStandardError": {"type": "number", "minimum": 0}
+          }
+        }
+      ]
+    },
+    "averageEffectInterval": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "lower", "upper", "standardError", "degreesOfFreedom"],
+          "properties": {
+            "status": {"const": "available"},
+            "lower": {"type": "number"},
+            "upper": {"type": "number"},
+            "standardError": {"type": "number", "exclusiveMinimum": 0},
+            "degreesOfFreedom": {"type": "number", "exclusiveMinimum": 0}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {"status": {"enum": ["unavailable_degenerate_variance", "unavailable_profile"]}}
+        }
+      ]
+    },
     "disposition": {"enum": ["evidence_of_change", "inconclusive"]},
-    "eligibility": {"type": "object", "additionalProperties": false, "required": ["eligible", "reasons"], "properties": {"eligible": {"type": "boolean"}, "reasons": {"type": "array", "items": {"type": "string"}}}}
+    "eligibility": {"type": "object", "additionalProperties": false, "required": ["eligible", "reasons"], "properties": {"eligible": {"type": "boolean"}, "reasons": {"type": "array", "uniqueItems": true, "items": {"type": "string", "minLength": 1}}}}
   }
 }

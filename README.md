@@ -20,8 +20,12 @@ processing, invited shops, randomized experiments, or production deployment.
 Run the safe gate locally:
 
 ```bash
+node --version  # requires Node 24+
+npm ci --ignore-scripts
 PYTHONDONTWRITEBYTECODE=1 python3 validation/phase0/validate_phase0.py
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s validation -p 'test_*.py' -v
+PYTHONDONTWRITEBYTECODE=1 python3 validation/phase1/validate_phase1.py
+PYTHONDONTWRITEBYTECODE=1 python3 validation/phase2/validate_phase2.py
 ```
 
 ## Legacy runtime
@@ -54,7 +58,9 @@ are complete. Current endpoint and field dispositions are in
 
 ## Phase 2 statistical validation
 
-Phase 2 runs without credentials or network access:
+Phase 2 runs without credentials or external requests. Its JSON Schemas are
+compiled at runtime and paired with semantic validation for cross-field rules,
+balanced assignment, and content hashes:
 
 ```bash
 npm run typecheck:phase2

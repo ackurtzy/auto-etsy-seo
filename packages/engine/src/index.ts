@@ -1,16 +1,20 @@
-import { createHash } from "node:crypto";
-
 import {
+  canonicalJson,
+  parseEvaluationResult,
+  parseEvidenceManifest,
+  parseFrozenExperimentSpec,
+  parseMethodProfile,
+  sha256,
   type EvaluationResult,
   type EvidenceManifest,
-  type ExperimentArm,
   type ExperimentSpecInput,
   type FrozenExperimentSpec,
   type MethodProfile,
-  validateExperimentSpecInput,
 } from "../../contracts/src/index.ts";
+import { freezeExperimentSpecWithAssignment } from "./spec.ts";
 
 export type { EvaluationResult, EvidenceManifest, ExperimentSpecInput, FrozenExperimentSpec, MethodProfile } from "../../contracts/src/index.ts";
+export { canonicalJson, sha256 } from "../../contracts/src/index.ts";
 
 export interface ClusterObservation {
   clusterId: string;
@@ -30,27 +34,6 @@ export const PRODUCTION_METHOD_PROFILE: MethodProfile = Object.freeze({
   intervalMinimumClusters: 8,
   intervalMinimumBaselineOutcomePerCluster: 5,
 });
-
-function canonicalValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonicalValue);
-  if (value !== null && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>)
-        .filter(([, item]) => item !== undefined)
-        .sort(([left], [right]) => left.localeCompare(right))
-        .map(([key, item]) => [key, canonicalValue(item)]),
-    );
-  }
-  return value;
-}
-
-export function canonicalJson(value: unknown): string {
-  return JSON.stringify(canonicalValue(value));
-}
-
-export function sha256(value: unknown): string {
-  return createHash("sha256").update(typeof value === "string" ? value : canonicalJson(value)).digest("hex");
-}
 
 export function createEvidenceManifest(input: {
   specHash: string;
@@ -77,7 +60,7 @@ export function createEvidenceManifest(input: {
     maturitySatisfied: input.maturitySatisfied,
     generatedAt: input.generatedAt,
   };
-  return Object.freeze({ ...withoutHash, manifestHash: sha256(withoutHash) });
+  return Object.freeze(parseEvidenceManifest({ ...withoutHash, manifestHash: sha256(withoutHash) }));
 }
 
 function choose(n: number, k: number): number {
@@ -99,40 +82,8 @@ export function attainableResolution(clusterCount: number, alpha: number): {
   return { assignmentCount, optimisticMinimumTwoSidedP, attainable: optimisticMinimumTwoSidedP <= alpha };
 }
 
-function deterministicAssignment(clusterIds: string[], seed: string): Record<string, ExperimentArm> {
-  const ordered = clusterIds
-    .map((clusterId) => ({ clusterId, rank: sha256(`${seed}\0${clusterId}`) }))
-    .sort((left, right) => left.rank.localeCompare(right.rank) || left.clusterId.localeCompare(right.clusterId));
-  const treatment = new Set(ordered.slice(0, clusterIds.length / 2).map((item) => item.clusterId));
-  return Object.fromEntries([...clusterIds].sort().map((clusterId) => [clusterId, treatment.has(clusterId) ? "treatment" : "control"]));
-}
-
-function validateAssignment(clusterIds: string[], assignment: Record<string, ExperimentArm>): void {
-  const expected = [...clusterIds].sort();
-  const actual = Object.keys(assignment).sort();
-  if (canonicalJson(expected) !== canonicalJson(actual)) throw new Error("assignment must contain every frozen cluster exactly once");
-  const treated = Object.values(assignment).filter((arm) => arm === "treatment").length;
-  const controls = Object.values(assignment).filter((arm) => arm === "control").length;
-  if (treated !== controls || treated + controls !== clusterIds.length) throw new Error("assignment must be balanced treatment and control");
-}
-
-export function freezeExperimentSpec(
-  input: ExperimentSpecInput,
-  suppliedAssignment?: Record<string, ExperimentArm>,
-): FrozenExperimentSpec {
-  validateExperimentSpecInput(input);
-  const clusterIds = input.clusterRoster.map((item) => item.clusterId);
-  const assignment = suppliedAssignment ?? deterministicAssignment(clusterIds, input.allocationSeed);
-  validateAssignment(clusterIds, assignment);
-  const frozenWithoutHash = {
-    ...structuredClone(input),
-    clusterRoster: structuredClone(input.clusterRoster).sort((a, b) => a.clusterId.localeCompare(b.clusterId)),
-    candidateHashes: Object.fromEntries(Object.entries(input.candidateHashes).sort(([a], [b]) => a.localeCompare(b))),
-    assignment: Object.fromEntries(Object.entries(assignment).sort(([a], [b]) => a.localeCompare(b))),
-    estimatorVersion: "listing-weighted-adjusted-v1" as const,
-    inferenceVersion: "balanced-sharp-null-v1" as const,
-  };
-  return Object.freeze({ ...frozenWithoutHash, specHash: sha256(frozenWithoutHash) });
+export function freezeExperimentSpec(input: ExperimentSpecInput): FrozenExperimentSpec {
+  return freezeExperimentSpecWithAssignment(input);
 }
 
 function combinations(values: number[], size: number): number[][] {
@@ -280,10 +231,11 @@ export function evaluateRandomizedExperiment(
   profile: MethodProfile,
   evidence: EvidenceManifest,
 ): EvaluationResult {
-  const { manifestHash, ...evidenceWithoutHash } = evidence;
-  if (sha256(evidenceWithoutHash) !== manifestHash) throw new Error("evidence manifest hash mismatch");
-  const { specHash, ...withoutHash } = spec;
-  if (sha256(withoutHash) !== specHash) throw new Error("experiment spec hash mismatch");
+  parseFrozenExperimentSpec(spec);
+  parseEvidenceManifest(evidence);
+  parseMethodProfile(profile);
+  const { manifestHash } = evidence;
+  const { specHash } = spec;
   if (profile.profileId !== spec.methodProfileId) throw new Error("method profile mismatch");
   if (evidence.specHash !== specHash || evidence.methodProfileId !== profile.profileId) throw new Error("evidence manifest does not bind this specification and method");
   if (!evidence.complete) throw new Error("evidence manifest is incomplete");
@@ -378,7 +330,7 @@ export function evaluateRandomizedExperiment(
   if (baselineTotal === 0) reasons.push("zero_baseline_requires_absolute_threshold_and_separate_profile_review");
   else if (Math.max(...ordered.map((item) => item.baselineTotal)) / baselineTotal > profile.maximumBaselineConcentration) reasons.push("baseline_concentration_exceeds_profile");
   if (interval.status !== "available") reasons.push("average_effect_interval_unavailable");
-  return {
+  return parseEvaluationResult({
     schemaVersion: "evaluation-result-v1",
     specHash,
     evidenceManifestHash: manifestHash,
@@ -388,7 +340,7 @@ export function evaluateRandomizedExperiment(
     averageEffectInterval: interval,
     disposition: pValue <= spec.alpha ? "evidence_of_change" : "inconclusive",
     eligibility: { eligible: reasons.length === 0, reasons },
-  };
+  });
 }
 
 export function directionalStudyResult(beforeTotal: number, afterTotal: number, scheduledDays: number): {

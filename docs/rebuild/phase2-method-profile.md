@@ -31,8 +31,10 @@ about every listing, or an automatic extrapolation to the whole shop.
 - `EvaluationResult` keeps the exact sharp-null result separate from the
   approximate average-effect interval.
 
-All five contracts have versioned JSON schemas under `packages/contracts` and
-runtime validation at the engine boundary.
+All five contracts have versioned JSON schemas under `packages/contracts`.
+Ajv enforces those shapes at runtime, and semantic parsers enforce cross-field,
+balanced-assignment, time-ordering, and content-hash invariants at the engine
+boundary.
 
 ## Inference
 
