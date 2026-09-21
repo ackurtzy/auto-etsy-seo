@@ -45,6 +45,7 @@ explicit blocker.
 PYTHONDONTWRITEBYTECODE=1 python3 -m validation.phase1.run_phase1_probe
 ```
 
+The configured 30-day listing and receipt observation completed on 2026-09-21.
 G1 remains open until the seven-day view diagnostic and H1 owner comparison
 are complete. Current endpoint and field dispositions are in
 `docs/rebuild/phase1-source-contracts.md`.

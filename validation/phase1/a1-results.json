@@ -1,30 +1,33 @@
 {
   "schema_version": "1.0",
   "gate": "A1",
-  "status": "partial_pass_live_receipts_blocked",
+  "status": "partial_pass_live_receipts_observed",
   "method_version": "phase1-a1-v1",
   "measurement_profile": "etsy-own-shop-phase1-draft-1",
   "repository_commit": "47ab4f58b930c9daeb89fcbc1a93a140b9dfa10e",
-  "executed_at": "2026-09-21T00:07:00Z",
+  "executed_at": "2026-09-21T00:51:06Z",
   "automated_tests": {
     "result": "passed",
     "count": 23,
     "external_requests": 0
   },
   "live_observation": {
-    "result": "partial",
-    "recorded_run_request_count": 3,
-    "task_total_external_calls": 11,
-    "task_call_breakdown": {"GET": 10, "POST_oauth_refresh": 1},
-    "token_refresh_result": "HTTP_400_no_credential_change_refresh_capability_removed",
+    "result": "complete_for_configured_30_day_window",
+    "recorded_run_request_count": 4,
+    "phase1_daily_ledger_used": 15,
+    "oauth_scope": "transactions_r",
     "active_listing_count": 46,
     "sample_listing_count": 10,
     "sample_state_counts": {"active": 9, "inactive": 1},
     "active_pagination_complete": true,
-    "receipt_pagination_complete": false,
-    "receipt_unavailable_reason": "expired_or_revoked_grant",
+    "receipt_pagination_complete": true,
+    "receipt_count": 112,
+    "receipt_currency_counts": {"USD": 112},
+    "receipt_item_money_known_count": 108,
+    "receipt_item_money_unknown_count": 4,
+    "receipt_item_money_unknown_reasons": {"refund_allocation_unavailable": 4},
     "buyer_data_persisted": false,
-    "private_report_sha256": "4f9c0bfe67b39f5e27f0244c09b6872b550a91f4d9998f60818cb011d9e5b881"
+    "private_report_sha256": "e4322dea9a357aafd50afbf94d5bc5c421d5a6e61fb94c8554c01c0d5366ca29"
   },
   "assertions": [
     "duplicate and reordered pages produce identical canonical totals",
@@ -37,17 +40,18 @@
     "buyer and address fields are removed by a whitelist before persistence",
     "same-version conflicts are quarantined",
     "corrections append revisions and move only the canonical pointer",
-    "the retained live observation uses only GET requests within signed scope",
-    "OAuth refresh was removed after review because it was outside the signed GET-only scope"
+    "the retained live measurement observation uses only GET requests within signed scope",
+    "the replacement OAuth grant is limited to transactions_r and credential material remains local and ignored",
+    "the configured 30-day receipt window completed in one paginated request"
   ],
   "failures": [
-    "the existing local personal OAuth grant is expired or revoked; one rejected refresh attempt made no credential change and refresh is no longer implemented",
-    "receipt quantity and money reconciliation has not run",
+    "four refunded receipts cannot support item-level money because the source does not allocate refunds to transaction lines",
+    "the live receipt aggregates have not completed H1 owner comparison",
     "seven consecutive view day-boundary observations and H1 have not completed"
   ],
   "limitations": [
     "No metric has passed G1.",
-    "The successful public listing read does not validate receipt or payment semantics.",
+    "The 30-day receipt read validates source coverage and item-level allocation behavior but has not passed owner comparison.",
     "The views field remains disabled as an experiment outcome.",
     "Detailed shop and listing identifiers remain only in ignored evidence."
   ]
