@@ -25,6 +25,18 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Install pinned Python validation dependencies
         run: python3 -m pip install --disable-pip-version-check -r validation/requirements.txt
+      - name: Generate Cloudflare binding types
+        run: npm run cf:types
+      - name: Type-check and test Phase 2
+        run: npm run typecheck:phase2 && npm run test:phase2
+      - name: Type-check and test Phase 3
+        run: npm run typecheck:phase3 && npm run test:phase3
+      - name: Build the Phase 3 review UI
+        run: npx tsc -p apps/web/tsconfig.json --noEmit && npm run build:web
+      - name: Apply Phase 3 migrations to local D1
+        run: npm run db:migrate:local
+      - name: Bundle the Worker without deploying
+        run: npm run cf:dry-run
       - name: Run credential-free unit and fault tests
         run: python3 -m unittest discover -s validation -p 'test_*.py' -v
       - name: Validate Phase 0 boundary
@@ -33,3 +45,5 @@ jobs:
         run: python3 validation/phase1/validate_phase1.py
       - name: Validate Phase 2 contracts and statistical evidence
         run: python3 validation/phase2/validate_phase2.py
+      - name: Validate Phase 3 foundation and evidence
+        run: python3 validation/phase3/validate_phase3.py

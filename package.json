@@ -7,14 +7,35 @@
   },
   "scripts": {
     "test:phase2": "node --test packages/engine/test/*.test.ts",
-    "typecheck:phase2": "tsc -p tsconfig.phase2.json --noEmit"
+    "typecheck:phase2": "tsc -p tsconfig.phase2.json --noEmit",
+    "test:phase3": "node --test packages/operations/test/*.test.ts packages/etsy/test/*.test.ts packages/security/test/*.test.ts",
+    "typecheck:phase3": "tsc -p tsconfig.phase3.json --noEmit",
+    "cf:types": "wrangler types --config apps/worker/wrangler.jsonc apps/worker/src/worker-configuration.d.ts",
+    "cf:dry-run": "wrangler deploy --dry-run --config apps/worker/wrangler.jsonc --outdir .phase3-dist",
+    "db:migrate:local": "wrangler d1 migrations apply auto-etsy-seo-local --local --config apps/worker/wrangler.jsonc",
+    "build:web": "vite build --config apps/web/vite.config.ts",
+    "build:phase3": "npm run build:web && npm run cf:dry-run"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20260921.1",
     "@types/node": "^24.10.1",
-    "typescript": "~5.9.3"
+    "@types/react": "19.2.8",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "~5.9.3",
+    "vite": "8.3.0",
+    "wrangler": "4.135.0"
   },
   "dependencies": {
+    "@clerk/backend": "3.18.1",
+    "@clerk/react": "6.16.1",
+    "@hono/clerk-auth": "3.1.1",
+    "@tanstack/react-query": "5.103.1",
     "ajv": "^8.20.0",
-    "ajv-formats": "^3.0.1"
+    "ajv-formats": "^3.0.1",
+    "hono": "4.13.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "zod": "4.6.5"
   }
 }

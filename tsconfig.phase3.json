@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "esModuleInterop": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node", "@cloudflare/workers-types"],
+    "skipLibCheck": true
+  },
+  "include": [
+    "packages/operations/src/**/*.ts",
+    "packages/operations/test/**/*.ts",
+    "packages/etsy/src/**/*.ts",
+    "packages/etsy/test/**/*.ts",
+    "packages/security/src/**/*.ts",
+    "packages/security/test/**/*.ts",
+    "apps/worker/src/**/*.ts"
+  ]
+}

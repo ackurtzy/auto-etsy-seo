@@ -11,7 +11,10 @@ has complete 30-day listing/receipt source coverage but still awaits H1 and the
 seven-day views diagnostic. Phase 2 now provides a pure TypeScript statistical
 engine, independent Python reference, frozen evidence contracts, and offline
 release simulations. G2 awaits the owner's H2 interpretation and product-route
-decision. The v1 Etsy/OpenAI runtime remains quarantined.
+decision. Phase 3 now has a production-shaped Cloudflare title-operation
+foundation, strict local F01-F15 evidence, encrypted Etsy OAuth/token rotation,
+and an exact-diff/recovery UI. G3a deployment and H3 are not yet run, so all
+write gates remain disabled. The v1 Etsy/OpenAI runtime remains quarantined.
 
 The only live capability is bounded Phase 1 validation for the owner's shop as
 recorded in the signed, ignored G0 evidence. Nothing enables Etsy writes, AI
@@ -27,6 +30,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 validation/phase0/validate_phase0.py
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s validation -p 'test_*.py' -v
 PYTHONDONTWRITEBYTECODE=1 python3 validation/phase1/validate_phase1.py
 PYTHONDONTWRITEBYTECODE=1 python3 validation/phase2/validate_phase2.py
+PYTHONDONTWRITEBYTECODE=1 python3 validation/phase3/validate_phase3.py
 ```
 
 ## Legacy runtime
@@ -75,3 +79,15 @@ too concentrated under a listing-as-cluster diagnostic, independent clusters
 have not been established, and G1/H1 remain incomplete. The supported current
 route is human-directed before/after reporting with no causal confidence or
 automatic winner. Randomized functionality remains disabled.
+
+## Phase 3 safe title foundation
+
+The Phase 3 build uses D1 as the command/authority/ledger source of truth,
+per-shop Durable Object scheduling, a bounded Workflow, private R2 recovery
+artifacts, Clerk authentication, and a single title-only Etsy adapter. A
+dispatch attempt is durably marked before network I/O; ambiguous outcomes are
+read-reconciled and never replayed.
+
+See `docs/rebuild/phase3-foundation.md` for local verification and the exact
+G3a → H3 deployment sequence. The checked-in configuration denies Etsy egress,
+denies title writes, and creates new connections with zero write allowance.

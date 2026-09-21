@@ -1,0 +1,8 @@
+# Copy to .dev.vars for local development. Never commit real values.
+CLERK_PUBLISHABLE_KEY=
+CLERK_SECRET_KEY=
+ETSY_CLIENT_ID=
+ETSY_API_KEY=
+CREDENTIAL_ENCRYPTION_KEY=
+RESEND_API_KEY=
+INCIDENT_EMAIL=

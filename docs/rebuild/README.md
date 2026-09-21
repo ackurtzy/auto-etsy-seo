@@ -21,6 +21,7 @@ python3 validation/phase0/validate_phase0.py
 python3 -m unittest discover -s validation -p 'test_*.py' -v
 python3 validation/phase1/validate_phase1.py
 python3 validation/phase2/validate_phase2.py
+python3 validation/phase3/validate_phase3.py
 ```
 
 The legacy runtime is preserved by Git tag `legacy-v1-2026-09-20` and is hard
@@ -39,3 +40,10 @@ contracts, with semantic validation for cross-field and hash invariants. A2 is
 credential-free. G2 does not pass until the owner
 completes H2 and accepts either the qualified randomized route or the explicit
 directional-only route. No randomized or write capability is enabled.
+
+Phase 3 implementation and credential-free local fault evidence are in
+`phase3-foundation.md`, `adr-0002-phase3-safe-mutation-foundation.md`,
+`apps/worker`, `apps/web`, `packages/operations`, `packages/etsy`,
+`packages/security`, `migrations`, and `validation/phase3`. Local A3 evidence
+does not pass G3: deployed simulator/Cloudflare evidence and the exact owner H3
+canary remain required, and all checked-in write controls default off.

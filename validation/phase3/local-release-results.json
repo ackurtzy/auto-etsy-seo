@@ -1,0 +1,36 @@
+{
+  "schema_version": "a3-local-validation-v1",
+  "passed": true,
+  "external_requests": 0,
+  "fault_matrix": [
+    {"id": "F01", "passed": true, "detail": "acceptance crash leaves no command or outbox"},
+    {"id": "F02", "passed": true, "detail": "stale authority creates no dispatchable work"},
+    {"id": "F03", "passed": true, "detail": "duplicate converges"},
+    {"id": "F04", "passed": true, "detail": "authority revalidated before dispatch"},
+    {"id": "F05", "passed": true, "detail": "potential send marker forbids replay"},
+    {"id": "F06", "passed": true, "detail": "lost response reconciles once"},
+    {"id": "F07", "passed": true, "detail": "verification persistence recovers by read"},
+    {"id": "F08", "passed": true, "detail": "bounded reconciliation retains lane"},
+    {"id": "F09", "passed": true, "detail": "revert owns title only"},
+    {"id": "F10", "passed": true, "detail": "owned edit preserved"},
+    {"id": "F11", "passed": true, "detail": "revocation boundary is explicit before versus after dispatch"},
+    {"id": "F12", "passed": true, "detail": "no mutation retry storm"},
+    {"id": "F13", "passed": true, "detail": "partial or unknown deployment blocks the shop lane"},
+    {"id": "F14", "passed": true, "detail": "restored state remains quarantined"},
+    {"id": "F15", "passed": true, "detail": "notification failure suspends exposure"}
+  ],
+  "contracts": {
+    "executor": "title-v1",
+    "credential_encryption": "aes-gcm-256-v1",
+    "operation_state": "phase3-operation-v1",
+    "oauth": "etsy-pkce-v1",
+    "recovery_manifest": "phase3-backup-manifest-v1"
+  },
+  "boundaries": {
+    "deployed_cloudflare_integration": "not_run",
+    "live_etsy_canary": "not_run",
+    "owner_h3": "not_run",
+    "title_t3": "disabled",
+    "tags_t3": "disabled"
+  }
+}

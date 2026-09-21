@@ -1,0 +1,58 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "auto-etsy-seo-phase3",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-09-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "assets": {
+    "directory": "../web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/health"]
+  },
+  "vars": {
+    "ENVIRONMENT": "local",
+    "ETSY_BASE_URL": "https://openapi.etsy.com/v3",
+    "ETSY_EGRESS_ENABLED": "false",
+    "TITLE_WRITES_ENABLED": "false",
+    "EXECUTOR_VERSION": "title-v1",
+    "PUBLIC_APP_ORIGIN": "http://localhost:8787"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "auto-etsy-seo-local",
+      "migrations_dir": "../../migrations"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "RECOVERY_BUCKET",
+      "bucket_name": "auto-etsy-seo-recovery-local"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "SHOP_COORDINATOR", "class_name": "ShopCoordinator" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["ShopCoordinator"] }
+  ],
+  "workflows": [
+    {
+      "binding": "OPERATION_WORKFLOW",
+      "name": "auto-etsy-seo-operation-local",
+      "class_name": "OperationWorkflow",
+      "limits": { "steps": 20 },
+      "default_retention": { "success_retention": "7 days", "error_retention": "30 days" }
+    }
+  ],
+  "observability": {
+    "enabled": true,
+    "redact_query_string": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 1 }
+  }
+}

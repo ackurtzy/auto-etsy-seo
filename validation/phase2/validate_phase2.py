@@ -153,9 +153,11 @@ def main() -> int:
         "docs/gates/G0.json",
         "docs/gates/G1.json",
         "docs/gates/G2.json",
+        "docs/gates/G3.json",
         "validation/phase0/a0-results.json",
         "validation/phase1/a1-results.json",
         "validation/phase2/a2-results.json",
+        "validation/phase3/a3-results.json",
     }
     unexpected = changed.difference(evidence_only)
     if unexpected:
