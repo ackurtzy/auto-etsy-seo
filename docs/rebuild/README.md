@@ -16,6 +16,7 @@ Run:
 ```bash
 node --version  # requires Node 24+
 npm ci --ignore-scripts
+python3 -m pip install --disable-pip-version-check -r validation/requirements.txt
 python3 validation/phase0/validate_phase0.py
 python3 -m unittest discover -s validation -p 'test_*.py' -v
 python3 validation/phase1/validate_phase1.py

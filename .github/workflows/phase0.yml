@@ -23,6 +23,8 @@ jobs:
           cache: npm
       - name: Install locked JavaScript dependencies without lifecycle scripts
         run: npm ci --ignore-scripts
+      - name: Install pinned Python validation dependencies
+        run: python3 -m pip install --disable-pip-version-check -r validation/requirements.txt
       - name: Run credential-free unit and fault tests
         run: python3 -m unittest discover -s validation -p 'test_*.py' -v
       - name: Validate Phase 0 boundary

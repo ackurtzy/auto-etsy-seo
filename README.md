@@ -22,6 +22,7 @@ Run the safe gate locally:
 ```bash
 node --version  # requires Node 24+
 npm ci --ignore-scripts
+python3 -m pip install --disable-pip-version-check -r validation/requirements.txt
 PYTHONDONTWRITEBYTECODE=1 python3 validation/phase0/validate_phase0.py
 PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s validation -p 'test_*.py' -v
 PYTHONDONTWRITEBYTECODE=1 python3 validation/phase1/validate_phase1.py
