@@ -2,7 +2,7 @@
   "gate_id": "G3",
   "status": "awaiting_G3a_deployment_and_H3",
   "scope": "phase3_safe_title_foundation",
-  "repository_commit": "9a9aeaf5e0dbc629ab2443f8a9534d68b07370f4",
+  "repository_commit": "b72d91d5c81013d02ac66e7261dcea3f32edcbc3",
   "deployed_build": "6bc9ae48-f87c-4635-9215-7b7552e60999",
   "contract_versions": {
     "executor": "title-v1",
@@ -17,7 +17,7 @@
       "result": "passed_local_foundation_awaiting_deployed_G3a_and_H3",
       "environment": "credential-free local and CI harness",
       "artifact": "validation/phase3/a3-results.json",
-      "sha256": "fd63bbd9cefc56818bac047d927e3c08a118c6ad5528801609751d683d087559"
+      "sha256": "218e18a6b340229407e9499252cbe66ab08978ef95193d398eb6ab355f64ba57"
     }
   ],
   "human_evidence": [],
