@@ -1,0 +1,38 @@
+{
+  "gate_id": "G3",
+  "status": "awaiting_G3a_deployment_and_H3",
+  "scope": "phase3_safe_title_foundation",
+  "repository_commit": "76d8a789b725808734b5eebd722bfc693f744723",
+  "deployed_build": null,
+  "contract_versions": {
+    "executor": "title-v1",
+    "operation_state": "phase3-operation-v1",
+    "oauth": "etsy-pkce-v1",
+    "credential_encryption": "aes-gcm-256-v1",
+    "recovery_manifest": "phase3-backup-manifest-v1"
+  },
+  "automated_evidence": [
+    {
+      "test_id": "A3-local",
+      "result": "passed_local_foundation_awaiting_deployed_G3a_and_H3",
+      "environment": "credential-free local and CI harness",
+      "artifact": "validation/phase3/a3-results.json",
+      "sha256": "ccff6686ff0e2edd6d002e9f0d5a2bbc7d5bc002ecded58f87846af0370185e7"
+    }
+  ],
+  "human_evidence": [],
+  "capability_dispositions": {
+    "title_T3": "disabled",
+    "tags_T3": "disabled",
+    "general_etsy_egress": "disabled"
+  },
+  "limitations": [
+    "G3a has not exercised the deployed Worker D1 Durable Object Workflow R2 Clerk and notification boundaries.",
+    "H3 has not authorized or observed a live title change revert conflict lost-response case revocation alert or restore.",
+    "A passing local F01-F15 harness cannot enable a production write capability.",
+    "The title canary permit must bind one exact shop listing baseline proposed value gate hash authority epochs and expiry.",
+    "Tags require a separate complete contract and field canary."
+  ],
+  "release_enablement_authorized": false,
+  "notes": "The Phase 3 implementation is complete enough to begin G3a deployment work. Checked-in and newly connected environments remain fail closed."
+}

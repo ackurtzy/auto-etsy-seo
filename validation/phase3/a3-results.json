@@ -1,0 +1,41 @@
+{
+  "schema_version": "a3-evidence-v1",
+  "gate": "A3-local",
+  "status": "passed_local_foundation_awaiting_deployed_G3a_and_H3",
+  "repository_commit": "76d8a789b725808734b5eebd722bfc693f744723",
+  "executed_at": "2026-09-21T02:36:35Z",
+  "external_requests": 0,
+  "automated_tests": {
+    "phase3_typescript": 14,
+    "phase2_typescript_regression": 22,
+    "python_regression": 34,
+    "fault_cases": 15
+  },
+  "artifacts": [
+    {"artifact": "apps/worker/wrangler.jsonc", "sha256": "178b83e57f29efd7c31ef50ced800988de17c325d38fdc49a42c2f345357493e"},
+    {"artifact": "migrations/0001_phase3_foundation.sql", "sha256": "da93c0f7d1ce9476911f2260a591882edb11c5e969a6a6e25b710b7c7f25487c"},
+    {"artifact": "migrations/0002_phase3_quota_recovery_oauth.sql", "sha256": "78b4dd9180def3bb61f3bfbc997a1c0c04616d1e556f33bfa21320c761d508fa"},
+    {"artifact": "validation/phase3/local-release-results.json", "sha256": "4e6522f6cfa360f2d49dd765c26c8c33a934f58e874e9aa26a3e848e9f035878"}
+  ],
+  "assertions": [
+    "all checked-in runtime write and Etsy egress gates default disabled",
+    "command acceptance and outbox insertion are one D1 batch guarded by current authority",
+    "dispatch claim atomically rechecks membership scopes epochs kill switches canary and quota",
+    "a potentially sent title mutation has one durable attempt marker and is never replayed",
+    "ambiguous outcomes use bounded read reconciliation and retain the shop lane",
+    "revert is a new exact authorization and changes only title after a fresh owned-state match",
+    "keep performs a fresh read and makes no Etsy mutation",
+    "OAuth uses PKCE exact shop identity and encrypted versioned credential rotation",
+    "restores quarantine egress and preserve deletion tombstone authority",
+    "F01 through F15 have explicit fail-closed local outcomes",
+    "the review UI builds and its unconfigured authentication boundary visibly fails closed"
+  ],
+  "failures": [],
+  "limitations": [
+    "Local and SQLite evidence does not pass G3a or G3.",
+    "No Cloudflare resource was provisioned or deployed and no provider request was made.",
+    "Clerk authenticated UI flow notification receipt token rotation and isolated restore require deployed verification.",
+    "A real Etsy title canary requires a separate exact expiring owner authorization after G3a.",
+    "Tags remain disabled pending their separate implementation contract and canary."
+  ]
+}
