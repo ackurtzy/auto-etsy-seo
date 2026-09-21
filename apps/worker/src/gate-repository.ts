@@ -57,7 +57,11 @@ export interface StartGateRunInput {
 }
 
 export class GateRepository {
-  constructor(private readonly db: D1Database) {}
+  private readonly db: D1Database;
+
+  constructor(db: D1Database) {
+    this.db = db;
+  }
 
   async listSession(actorId: string): Promise<{ tenants: Array<{ id: string; name: string; role: string; shops: Array<{ id: string; externalShopId: string; status: string }> }> }> {
     const rows = await this.db.prepare(`
@@ -126,7 +130,7 @@ export class GateRepository {
     if (previous) statements.push(this.db.prepare(`UPDATE gate_review_runs SET state='superseded',superseded_at=?,updated_at=? WHERE id=? AND superseded_at IS NULL`).bind(now, now, previous.id));
     statements.push(this.db.prepare(`
       INSERT INTO gate_review_runs(id,tenant_id,shop_connection_id,gate_id,protocol_version,build_version,evidence_revision,evidence_sha256,automated_evidence_passed,enabled_outcome_metrics_json,state,created_by,created_at,updated_at)
-      VALUES(?,?,?,?,?,?,?,?,?,?, 'ready_for_review',?,?,?,?)
+      VALUES(?,?,?,?,?,?,?,?,?,?, 'ready_for_review',?,?,?)
     `).bind(runId, scope.tenantId, scope.shopId, input.gateId, input.protocolVersion, input.buildVersion, input.evidenceRevision, input.evidenceSha256,
       input.automatedEvidencePassed ? 1 : 0, JSON.stringify(input.enabledOutcomeMetrics), scope.actorId, now, now));
     for (const [index, item] of input.items.entries()) {

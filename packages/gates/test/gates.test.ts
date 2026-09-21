@@ -8,6 +8,7 @@ import {
   selectRepresentativeReceipts,
   type GateReviewSnapshot,
 } from "../src/index.ts";
+import { GateRepository } from "../../../apps/worker/src/gate-repository.ts";
 import { resolveLocalOwnerActor } from "../../../apps/worker/src/local-auth.ts";
 
 function snapshot(overrides: Partial<GateReviewSnapshot> = {}): GateReviewSnapshot {
@@ -115,4 +116,48 @@ test("local owner mode is limited to an explicit local environment and loopback 
   assert.equal(resolveLocalOwnerActor({ ...env, ENVIRONMENT: "staging" } as never, new Request("https://seo.adesignsdenver.com/api/v1/session")), null);
   assert.equal(resolveLocalOwnerActor(env as never, new Request("https://seo.adesignsdenver.com/api/v1/session")), null);
   assert.equal(resolveLocalOwnerActor({ ...env, LOCAL_OWNER_MODE: "false" } as never, new Request("http://127.0.0.1:8787/api/v1/session")), null);
+});
+
+test("gate run persistence binds exactly one value for every SQL placeholder", async () => {
+  const preparedQueries: string[] = [];
+  const db = {
+    prepare(query: string) {
+      preparedQueries.push(query);
+      return {
+        bind(...values: unknown[]) {
+          const placeholders = query.match(/\?/g)?.length ?? 0;
+          assert.equal(values.length, placeholders, `SQL expected ${placeholders} bindings but received ${values.length}`);
+          return this;
+        },
+        async first() {
+          return query.includes("FROM memberships") ? { ok: 1 } : null;
+        },
+      };
+    },
+    async batch(statements: unknown[]) {
+      return statements.map(() => ({ success: true, meta: { changes: 1 } }));
+    },
+  };
+  const repository = new GateRepository(db as unknown as D1Database);
+
+  const runId = await repository.startRun({ tenantId: "tenant-1", shopId: "shop-1", actorId: "owner-1" }, {
+    gateId: "G2",
+    protocolVersion: "h2-test-v1",
+    buildVersion: "test-build",
+    evidenceRevision: "g2:test-evidence",
+    evidenceSha256: "a".repeat(64),
+    automatedEvidencePassed: true,
+    enabledOutcomeMetrics: [],
+    items: [{
+      itemId: "interpretation-test",
+      category: "interpretation",
+      label: "Test interpretation",
+      instructions: "Confirm the interpretation.",
+      required: true,
+      comparison: { disposition: "understood" },
+    }],
+  }, "2026-09-21T17:30:00.000Z");
+
+  assert.match(runId, /^[0-9a-f-]{36}$/);
+  assert.ok(preparedQueries.some((query) => query.includes("INSERT INTO gate_review_runs")));
 });
