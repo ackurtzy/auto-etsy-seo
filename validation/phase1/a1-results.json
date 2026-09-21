@@ -4,7 +4,7 @@
   "status": "partial_pass_historical_live_evidence_requires_revalidation",
   "method_version": "phase1-a1-v1",
   "measurement_profile": "etsy-own-shop-phase1-draft-1",
-  "repository_commit": "faba7dcc44dd537ab904a8deda93e03d47a3bacb",
+  "repository_commit": "52e7fd76c00adb1531c725ea76958a534d97d07c",
   "executed_at": "2026-09-21T00:51:06Z",
   "automated_tests": {
     "result": "passed",
