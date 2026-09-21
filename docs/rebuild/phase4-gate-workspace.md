@@ -28,8 +28,8 @@ should never be uploaded.
 
 ## Gate 2 — interpret results honestly
 
-After G1 approval, the server creates the six-part H2 protocol bound to the
-approved A2 artifact. The owner acknowledges exact-enumeration resolution,
+After G1 approval, the server creates the six-part H2 protocol bound to A2's
+immutable release-results artifact. The owner acknowledges exact-enumeration resolution,
 power, weighting, directional before/after limits, heterogeneous-effect
 interpretation, and the current shop route. Approval records the
 `directional_only` disposition. Randomized inference and automatic winner

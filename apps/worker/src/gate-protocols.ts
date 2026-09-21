@@ -3,8 +3,9 @@ import { GateRepository, type GateEvidenceItemInput } from "./gate-repository.ts
 
 interface Scope { tenantId: string; shopId: string; actorId: string }
 
-const G2_EVIDENCE_SHA256 = "5680a68435a639818cd10bc487c993d0e06669173bdef8cbbbafab1dd13c3282";
-const G3_LOCAL_EVIDENCE_SHA256 = "d42c8b5605a71bd7d92f8dfcca64791461e222551f60484cdeb7e4d4e0f43cd0";
+// Immutable generated artifacts, not the revision-bearing A2/A3 summary records.
+const G2_EVIDENCE_SHA256 = "6250fc9ea24b60d8e25f6e76dbfba5f01208c22d1fc03c73ab7d021e8819dada";
+const G3_LOCAL_EVIDENCE_SHA256 = "4e6522f6cfa360f2d49dd765c26c8c33a934f58e874e9aa26a3e848e9f035878";
 
 const interpretationProtocol: Array<readonly [string, string, string]> = [
   ["six-clusters", "Six clusters", "Confirm you understand that the smallest exact two-sided p-value cannot reach 0.05, so launch is rejected."],
