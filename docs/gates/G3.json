@@ -2,8 +2,8 @@
   "gate_id": "G3",
   "status": "awaiting_G3a_deployment_and_H3",
   "scope": "phase3_safe_title_foundation",
-  "repository_commit": "3b63c12c5a67ee60723e651a90c102cb66301711",
-  "deployed_build": null,
+  "repository_commit": "9a9aeaf5e0dbc629ab2443f8a9534d68b07370f4",
+  "deployed_build": "6bc9ae48-f87c-4635-9215-7b7552e60999",
   "contract_versions": {
     "executor": "title-v1",
     "operation_state": "phase3-operation-v1",
@@ -17,7 +17,7 @@
       "result": "passed_local_foundation_awaiting_deployed_G3a_and_H3",
       "environment": "credential-free local and CI harness",
       "artifact": "validation/phase3/a3-results.json",
-      "sha256": "00cdd798776030783630752080d30fafc96301bab5ae80d8ffdac04b1b37959b"
+      "sha256": "fd63bbd9cefc56818bac047d927e3c08a118c6ad5528801609751d683d087559"
     }
   ],
   "human_evidence": [],
@@ -27,12 +27,13 @@
     "general_etsy_egress": "disabled"
   },
   "limitations": [
-    "G3a has not exercised the deployed Worker D1 Durable Object Workflow R2 Clerk and notification boundaries.",
+    "The fail-closed Worker shell and custom domain are deployed, but G3a has not exercised D1 Durable Object Workflow R2 Clerk and notification boundaries.",
+    "Remote D1 migration is deferred because the shared UTC-day maintenance reservation is already consumed; Workflow registration and Clerk secrets are also incomplete.",
     "H3 has not authorized or observed a live title change revert conflict lost-response case revocation alert or restore.",
     "A passing local F01-F15 harness cannot enable a production write capability.",
     "The title canary permit must bind one exact shop listing baseline proposed value gate hash authority epochs and expiry.",
     "Tags require a separate complete contract and field canary."
   ],
   "release_enablement_authorized": false,
-  "notes": "The Phase 3 implementation is complete enough to begin G3a deployment work. Checked-in and newly connected environments remain fail closed."
+  "notes": "The Phase 3 implementation is complete enough to continue G3a deployment work. The deployed shell and all newly connected environments remain fail closed."
 }

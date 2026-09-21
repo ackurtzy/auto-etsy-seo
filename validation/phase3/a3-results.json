@@ -2,8 +2,8 @@
   "schema_version": "a3-evidence-v1",
   "gate": "A3-local",
   "status": "passed_local_foundation_awaiting_deployed_G3a_and_H3",
-  "repository_commit": "3b63c12c5a67ee60723e651a90c102cb66301711",
-  "executed_at": "2026-09-21T14:55:35Z",
+  "repository_commit": "9a9aeaf5e0dbc629ab2443f8a9534d68b07370f4",
+  "executed_at": "2026-09-21T15:19:15Z",
   "external_requests": 0,
   "automated_tests": {
     "phase3_typescript": 16,
@@ -28,12 +28,13 @@
     "OAuth uses PKCE exact shop identity and encrypted versioned credential rotation",
     "restores quarantine egress and preserve deletion tombstone authority",
     "F01 through F15 have explicit fail-closed local outcomes",
-    "the review UI builds and its unconfigured authentication boundary visibly fails closed"
+    "the review UI builds and its unconfigured authentication boundary visibly fails closed",
+    "local owner mode requires an explicit local switch and a loopback request hostname"
   ],
   "failures": [],
   "limitations": [
     "Local and SQLite evidence does not pass G3a or G3.",
-    "No Cloudflare resource was provisioned or deployed and no provider request was made.",
+    "The fail-closed Worker shell is deployed, but D1 migrations, Workflow registration, Clerk, and G3a remain incomplete.",
     "Clerk authenticated UI flow notification receipt token rotation and isolated restore require deployed verification.",
     "A real Etsy title canary requires a separate exact expiring owner authorization after G3a.",
     "Tags remain disabled pending their separate implementation contract and canary."
