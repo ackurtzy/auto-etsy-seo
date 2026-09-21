@@ -84,7 +84,11 @@ def main() -> int:
         raise AssertionError("G1 and A1 do not bind the same implementation revision")
     if not SHA256.fullmatch(str(a1.get("live_observation", {}).get("private_report_sha256", ""))):
         raise AssertionError("A1 private report reference is invalid")
-    suite = unittest.defaultTestLoader.discover(str(ROOT / "validation" / "phase1"), pattern="test_*.py")
+    suite = unittest.defaultTestLoader.discover(
+        str(ROOT / "validation" / "phase1"),
+        pattern="test_*.py",
+        top_level_dir=str(ROOT),
+    )
     result = unittest.TextTestRunner(stream=io.StringIO(), verbosity=0).run(suite)
     if not result.wasSuccessful():
         raise AssertionError("Phase 1 unit tests failed")
