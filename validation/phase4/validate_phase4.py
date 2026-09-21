@@ -69,6 +69,8 @@ def validate_product_workspace() -> None:
             raise AssertionError(f"human-readable gate workspace is missing: {copy}")
     if not (ROOT / "apps/web/public/assets/botanical-journal.png").is_file():
         raise AssertionError("the approved Phase 4 visual asset is missing")
+    if 'item.response?.outcome ?? "matched"' in app or "draftOutcome" not in app:
+        raise AssertionError("Gate 1 must require an explicit human comparison outcome")
 
 
 def main() -> int:
