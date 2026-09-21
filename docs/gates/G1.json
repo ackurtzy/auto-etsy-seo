@@ -2,7 +2,7 @@
   "gate_id": "G1",
   "status": "in_progress",
   "scope": "owner_shop_read_only_measurement_validation",
-  "repository_commit": "7affa6cc8c8b2ad7b1eccbec1bae8df9512d61b1",
+  "repository_commit": "2377b969e90944c9733c24f68ab30cbb09726d64",
   "contract_versions": {
     "measurement_profile": "draft-1",
     "sanitizer": "1.0",
@@ -13,7 +13,7 @@
       "test_id": "A1",
       "result": "partial_pass_live_receipts_observed",
       "artifact": "validation/phase1/a1-results.json",
-      "sha256": "b7bc1620d26ebc0218c718ce3305719f13d517e50ae8c7c76ef0ce8b358c09e9"
+      "sha256": "2c5652a74b3457c3e82422b075d7e8f1e9e863293ca95932721b9eab0d134270"
     }
   ],
   "human_evidence": [],

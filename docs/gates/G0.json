@@ -8,7 +8,7 @@
     "method_profile": null
   },
   "status": "passed_with_explicitly_disabled_capabilities",
-  "repository_commit": "7affa6cc8c8b2ad7b1eccbec1bae8df9512d61b1",
+  "repository_commit": "2377b969e90944c9733c24f68ab30cbb09726d64",
   "deployed_build": null,
   "contract_versions": {"phase0_records": "1.0", "egress_guard": "1.0"},
   "automated_evidence": [
@@ -17,7 +17,7 @@
       "result": "passed",
       "environment": "credential-free local and CI harness",
       "artifact": "validation/phase0/a0-results.json",
-      "sha256": "5a6e1a8fce0390097cb79acc0eb1d6a2e0748852fee9880eb7f362e5b5711df4"
+      "sha256": "ab91c4522dc55acf184fbabd9e87705757e0430a56a10bb74d54809eae675dc4"
     }
   ],
   "human_evidence": [

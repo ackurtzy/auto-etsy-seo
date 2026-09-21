@@ -2,7 +2,7 @@
   "gate_id": "G2",
   "status": "awaiting_H2_owner_disposition",
   "scope": "statistical_method_and_shop_feasibility",
-  "repository_commit": "d9f3b7d821fb3aee2cbe69cc44a36068a4c8cde3",
+  "repository_commit": "2377b969e90944c9733c24f68ab30cbb09726d64",
   "contract_versions": {
     "experiment_spec": "v1",
     "method_profile": "balanced-cluster-v1",
@@ -15,7 +15,7 @@
       "test_id": "A2",
       "result": "passed_automated_awaiting_H2",
       "artifact": "validation/phase2/a2-results.json",
-      "sha256": "b85f5f4d6d277748f2884dabb005e6c5cf0fccca22f0a1ab032d66fecf4557ee"
+      "sha256": "9c4e3d2ab00b3dbb434c03e41f326f2c416062e2aaa25696508cb726b1dfdd36"
     }
   ],
   "human_evidence": [],

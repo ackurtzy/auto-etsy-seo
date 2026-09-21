@@ -5,7 +5,7 @@
   "method_version": "phase0-a0-v1",
   "fixture_version": "synthetic-listing-v1",
   "repository_baseline": "8c8ecd11341764dc31c03692acdc061d8584e329",
-  "implementation_revision": "7affa6cc8c8b2ad7b1eccbec1bae8df9512d61b1",
+  "implementation_revision": "2377b969e90944c9733c24f68ab30cbb09726d64",
   "scope": "credential-free fixtures and default-deny egress only",
   "external_requests": 0,
   "credentials_required": false,
